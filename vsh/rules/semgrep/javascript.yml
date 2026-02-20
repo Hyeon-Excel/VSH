@@ -1,0 +1,16 @@
+rules:
+  - id: VSH-JS-XSS-001
+    message: "XSS 가능성: 사용자 입력이 innerHTML로 직접 삽입됩니다."
+    languages: [javascript, typescript]
+    severity: ERROR
+    patterns:
+      - pattern: document.getElementById($X).innerHTML = $Y
+    metadata:
+      severity: HIGH
+      cwe: "CWE-79"
+      cvss: 8.2
+      cve: "CVE-2022-25858"
+      fix: "document.getElementById(\"output\").textContent = userInput;"
+      references:
+        - "KISA 시큐어코딩 가이드 - 입력데이터 검증 및 표현"
+        - "OWASP Top 10 - XSS"

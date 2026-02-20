@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vsh"
+version = "1.0.0"
+description = "Vibe Secure Helper (VSH) - real-time AppSec interceptor with SBOM/OSV and hallucinated package detection"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.6",
+  "rich>=13.7",
+  "pyyaml>=6.0",
+  "requests>=2.31",
+  "tqdm>=4.66",
+]
+
+[project.scripts]
+vsh = "vsh.cli:main"
+
+[tool.setuptools]
+packages = ["vsh"]
+
+[tool.setuptools.package-data]
+vsh = ["rules/semgrep/*.yml", "demo_targets/*", "scripts/*"]

@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+vsh/__init__.py
+vsh/cli.py
+vsh.egg-info/PKG-INFO
+vsh.egg-info/SOURCES.txt
+vsh.egg-info/dependency_links.txt
+vsh.egg-info/entry_points.txt
+vsh.egg-info/requires.txt
+vsh.egg-info/top_level.txt
+vsh/demo_targets/js_xss.js
+vsh/demo_targets/python_pkg_hallucination.py
+vsh/demo_targets/python_sqli.py
+vsh/rules/semgrep/javascript.yml
+vsh/rules/semgrep/python.yml

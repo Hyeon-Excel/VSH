@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: vsh
+Version: 1.0.0
+Summary: Vibe Secure Helper (VSH) - real-time AppSec interceptor with SBOM/OSV and hallucinated package detection
+Requires-Python: >=3.10
+Requires-Dist: pydantic>=2.6
+Requires-Dist: rich>=13.7
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: requests>=2.31
+Requires-Dist: tqdm>=4.66

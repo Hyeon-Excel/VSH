@@ -1,0 +1,1 @@
+import reqeusts  # typo (requests)

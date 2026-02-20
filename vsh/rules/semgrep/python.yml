@@ -1,0 +1,43 @@
+rules:
+  - id: VSH-PY-SQLI-001
+    message: "SQL Injection 가능성: 사용자 입력이 쿼리에 직접 결합됩니다."
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: cursor.execute(f"...{...}...")
+    metadata:
+      severity: CRITICAL
+      cwe: "CWE-89"
+      cvss: 9.8
+      cve: "CVE-2023-32315"
+      fix: "query = \"SELECT * FROM users WHERE id = %s\"; cursor.execute(query, (user_input,))"
+      references:
+        - "KISA 시큐어코딩 가이드 - 입력데이터 검증 및 표현"
+
+  - id: VSH-PY-SECRET-001
+    message: "하드코딩된 Secret Key 가능성: 민감정보가 코드에 포함될 수 있습니다."
+    languages: [python]
+    severity: WARNING
+    pattern-regex: "(?i)(secret_key|api_key|token)\\s*=\\s*['\"][^'\"]+['\"]"
+    metadata:
+      severity: HIGH
+      cwe: "CWE-798"
+      cvss: 8.4
+      fix: "환경변수(.env)로 분리하고 런타임에 로드하세요."
+      references:
+        - "KISA 시큐어코딩 가이드 - 보안기능 (키 관리)"
+
+  - id: VSH-PY-CMDI-001
+    message: "Command Injection 가능성: 외부 입력이 시스템 명령 실행으로 연결될 수 있습니다."
+    languages: [python]
+    severity: WARNING
+    pattern-either:
+      - pattern: os.system($X)
+      - pattern: subprocess.Popen($X, ...)
+    metadata:
+      severity: HIGH
+      cwe: "CWE-78"
+      cvss: 8.6
+      fix: "shell=True 사용을 피하고, 입력을 whitelist 검증하세요."
+      references:
+        - "OWASP Top 10 - Injection"

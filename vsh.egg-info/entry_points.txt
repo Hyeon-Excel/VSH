@@ -1,0 +1,2 @@
+[console_scripts]
+vsh = vsh.cli:main

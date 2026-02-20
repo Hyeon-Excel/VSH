@@ -1,0 +1,7 @@
+services:
+  vsh:
+    build: .
+    volumes:
+      - ..:/work
+    working_dir: /work
+    command: ["vsh", "vsh/demo_targets", "--out", "vsh_out", "--lang", "python", "--no-syft"]
