@@ -1,0 +1,12 @@
+.env
+*.pem
+*.key
+*.pfx
+reports/
+artifacts/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
