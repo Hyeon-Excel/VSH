@@ -1,0 +1,18 @@
+rules:
+  - id: vsh.python.sqli.fstring
+    message: Potential SQL injection via string interpolation.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      severity: HIGH
+      cwe: ["CWE-89"]
+      owasp: ["A03"]
+      kisa_key: "INPUT_VALIDATION_1"
+      fsec_key: "WEB_3_1"
+      category: "CODE"
+    patterns:
+      - pattern: $QUERY = f"...{...}..."
+      - pattern-inside: |
+          ...
+          $DB.execute($QUERY)
+          ...

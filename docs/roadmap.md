@@ -12,11 +12,11 @@ Exit criteria:
 
 ## Phase 1: L1 MVP
 
-- [ ] Semgrep runner 구현 (timeout, JSON 파싱)
-- [ ] finding normalize 구현 (metadata 매핑)
-- [ ] annotation patch 생성기 구현
-- [ ] `vsh.l1.scan_annotate` MCP 연결
-- [ ] fixture 기반 테스트 통과
+- [x] Semgrep runner 구현 (timeout, JSON 파싱)
+- [x] finding normalize 구현 (metadata 매핑)
+- [x] annotation patch 생성기 구현
+- [x] `vsh.l1.scan_annotate` MCP 연결
+- [x] fixture 기반 테스트 통과
 
 Exit criteria:
 

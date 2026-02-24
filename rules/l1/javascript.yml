@@ -1,0 +1,14 @@
+rules:
+  - id: vsh.js.xss.innerhtml
+    message: Potential XSS via innerHTML assignment.
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      severity: HIGH
+      cwe: ["CWE-79"]
+      owasp: ["A03"]
+      kisa_key: "OUTPUT_ENCODING_1"
+      fsec_key: "WEB_3_2"
+      category: "CODE"
+    patterns:
+      - pattern: $E.innerHTML = $X
