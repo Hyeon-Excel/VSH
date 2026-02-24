@@ -1,0 +1,47 @@
+rules:
+  - id: vsh.python.sqli.fstring
+    patterns:
+      - pattern: $CURSOR.execute(f"... {$INPUT} ...")
+      - pattern: $CURSOR.execute(f'... {$INPUT} ...')
+    message: >
+      SQL 쿼리에 f-string으로 외부 입력이 직접 삽입됩니다.
+      Parameterized Query 사용으로 SQL Injection을 방지하세요.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: CWE-89
+      cvss: 9.8
+      cve: CVE-2023-32315
+      fix: 'cursor.execute("SELECT * FROM users WHERE id = %s", (user_input,))'
+      impact: "DB 전체 조회 / 삭제 / 변조 가능"
+      kisa: "입력데이터 검증 및 표현 1항"
+
+  - id: vsh.python.sqli.format
+    patterns:
+      - pattern: $CURSOR.execute("..." % $INPUT)
+      - pattern: $CURSOR.execute('...' % $INPUT)
+      - pattern: $CURSOR.execute("..." + $INPUT)
+    message: >
+      SQL 쿼리에 % 포맷팅 또는 문자열 연결로 외부 입력이 삽입됩니다.
+      Parameterized Query를 사용하세요.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: CWE-89
+      cvss: 9.8
+      fix: 'cursor.execute("SELECT * FROM users WHERE id = %s", (user_input,))'
+      impact: "DB 전체 조회 / 삭제 / 변조 가능"
+
+  - id: vsh.python.sqli.raw_format
+    pattern: |
+      $QUERY = f"... {$INPUT} ..."
+      $CURSOR.execute($QUERY)
+    message: >
+      f-string으로 생성된 쿼리를 execute()에 전달합니다. SQL Injection 위험이 있습니다.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: CWE-89
+      cvss: 9.8
+      fix: 'cursor.execute("SELECT * FROM users WHERE id = %s", (user_input,))'
+      impact: "DB 전체 조회 / 삭제 / 변조 가능"

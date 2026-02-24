@@ -1,0 +1,40 @@
+rules:
+  - id: vsh.js.xss.innerhtml
+    patterns:
+      - pattern: $EL.innerHTML = $INPUT
+      - pattern-not: $EL.innerHTML = "..."
+    message: >
+      innerHTML에 사용자 입력을 직접 삽입하면 XSS 취약점이 발생합니다.
+      textContent 또는 DOMPurify.sanitize()를 사용하세요.
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      cwe: CWE-79
+      cvss: 8.2
+      cve: CVE-2022-25858
+      fix: "element.textContent = userInput;"
+      impact: "악성 스크립트 실행 / 세션 탈취 / 피싱 페이지 삽입 가능"
+
+  - id: vsh.js.xss.document_write
+    pattern: document.write($INPUT)
+    message: >
+      document.write()는 XSS에 취약합니다. DOM 조작 API를 사용하세요.
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      cwe: CWE-79
+      cvss: 8.2
+      fix: "document.getElementById('output').textContent = userInput;"
+      impact: "악성 스크립트 실행 가능"
+
+  - id: vsh.js.xss.eval
+    pattern: eval($INPUT)
+    message: >
+      eval()에 외부 입력을 전달하면 임의 스크립트가 실행됩니다.
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      cwe: CWE-79
+      cvss: 9.0
+      fix: "# eval() 사용을 제거하고 로직을 재설계하세요"
+      impact: "원격 코드 실행(RCE) 가능"

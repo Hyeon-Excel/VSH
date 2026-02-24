@@ -1,0 +1,19 @@
+rules:
+  - id: vsh.python.path_traversal.open
+    patterns:
+      - pattern: open($INPUT, ...)
+      - pattern-not: open("...", ...)
+    message: >
+      open()에 외부 입력을 직접 전달하면 경로 조작(Path Traversal)이 가능합니다.
+      realpath()로 정규화하고 허용 경로를 검증하세요.
+    languages: [python]
+    severity: WARNING
+    metadata:
+      cwe: CWE-22
+      cvss: 7.5
+      fix: |
+        safe = os.path.realpath(user_path)
+        if not safe.startswith(ALLOWED_BASE):
+            raise ValueError("경로 이탈 시도")
+        open(safe)
+      impact: "서버 파일 시스템 임의 접근 가능"

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "vsh"
+version = "0.1.0"
+description = "Vibe Security Helper — AI 코딩 환경 실시간 보안 분석 MCP 도구"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp[cli]>=1.2.0",
+    "requests>=2.31.0",
+    "packaging>=23.0",
+]
+
+[project.optional-dependencies]
+l1 = [
+    "semgrep>=1.60.0",
+]
+l2 = [
+    "anthropic>=0.40.0",
+    "langchain>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "chromadb>=0.5.0",
+]
+l3 = [
+    # SonarQube REST API 연동은 별도 SonarQube 서버 설치 필요
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+vsh = "vsh.server:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

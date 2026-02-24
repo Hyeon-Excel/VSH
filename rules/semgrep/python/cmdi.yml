@@ -1,0 +1,41 @@
+rules:
+  - id: vsh.python.cmdi.os_system
+    pattern: os.system($INPUT)
+    message: >
+      os.system()에 외부 입력이 전달되면 OS 명령어 삽입이 가능합니다.
+      subprocess.run(shell=False)으로 교체하세요.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: CWE-78
+      cvss: 9.8
+      fix: "subprocess.run(['cmd', user_arg], shell=False, check=True)"
+      impact: "원격 코드 실행(RCE) 가능"
+
+  - id: vsh.python.cmdi.subprocess_shell_true
+    patterns:
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern: subprocess.call(..., shell=True, ...)
+      - pattern: subprocess.Popen(..., shell=True, ...)
+      - pattern: subprocess.check_output(..., shell=True, ...)
+    message: >
+      subprocess 호출에 shell=True 를 사용하면 인자에 따라 명령어 삽입이 가능합니다.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: CWE-78
+      cvss: 9.8
+      fix: "subprocess.run(['cmd', arg1, arg2], shell=False)"
+      impact: "원격 코드 실행(RCE) 가능"
+
+  - id: vsh.python.cmdi.eval
+    pattern: eval($INPUT)
+    message: >
+      eval()에 신뢰할 수 없는 입력을 전달하면 임의 코드가 실행됩니다.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      cwe: CWE-78
+      cvss: 9.8
+      fix: "# eval() 대신 ast.literal_eval() 또는 로직 재설계"
+      impact: "원격 코드 실행(RCE) 가능"
