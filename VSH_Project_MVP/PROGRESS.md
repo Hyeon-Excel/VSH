@@ -1,6 +1,6 @@
 # PROGRESS.md — 개발 진행 상태
 
-## 현재 단계: Step 3 준비 중
+## 현재 단계: Step 5 준비 중
 
 ---
 
@@ -11,8 +11,8 @@
 | 0 | 프로젝트 세팅 | 완료 | 260225 |
 | 1 | Domain Model | 완료 | 260225 |
 | 2 | Repository + Mock DB | 완료 | 260225 |
-| 3 | Scanner (L1) | 대기 | - |
-| 4 | Analyzer (L2) | 대기 | - |
+| 3 | Scanner (L1) | 완료 | 260225 |
+| 4 | Analyzer (L2) | 완료 | 260225 |
 | 5 | Pipeline | 대기 | - |
 | 6 | MCP 툴 등록 | 대기 | - |
 | 7 | Dashboard | 대기 | - |
@@ -38,15 +38,15 @@
 - [x] find_by_id(), save() 호출 결과 확인
 
 ### Step 3 — Scanner (L1)
-- [ ] 테스트용 취약 파일로 SemgrepScanner 실행 결과 확인
-- [ ] TreeSitterScanner Python 파싱 확인
-- [ ] SBOMScanner requirements.txt 취약 패키지 탐지 확인
-- [ ] supported_languages() 반환값 확인
+- [x] 테스트용 취약 파일로 SemgrepScanner 실행 결과 확인
+- [x] TreeSitterScanner Python 파싱 확인
+- [x] SBOMScanner requirements.txt 취약 패키지 탐지 확인
+- [x] supported_languages() 반환값 확인
 
 ### Step 4 — Analyzer (L2)
-- [ ] L1 결과를 넘겼을 때 Claude API 응답 확인
-- [ ] 취약점 판단 결과 파싱 확인 (있음/없음/오탐)
-- [ ] 수정 제안 코드 생성 확인
+- [x] L1 결과를 넘겼을 때 Gemini API 응답 확인
+- [x] 취약점 판단 결과 파싱 확인 (있음/없음/오탐)
+- [x] 수정 제안 코드 생성 확인
 
 ### Step 5 — Pipeline
 - [ ] 취약한 파일 → L1 → L2 흐름 정상 실행
@@ -85,3 +85,16 @@
 | 260225 | [결정] BaseRead/WriteRepository 분리: LSP 위반 방지 및 읽기 전용 데이터의 무결성 보장 |
 | 260225 | [결정] find_by_id() 반환값: 항목 부재 시 None 반환 ({} 반환 시 존재 여부 확인 로직 모호성 제거) |
 | 260225 | [결정] config.py 추가: 참조 데이터 경로는 상수로 관리하고 런타임 로그 경로만 .env로 관리 |
+| 260225 | Step 3 완료: L1 Scanner 구현 완료 (Semgrep, Tree-sitter, SBOM) |
+| 260225 | [결정] BaseReadRepository find_all() 추가: Scanner의 패턴 매칭을 위해 전체 보안 규칙 조회가 필수적임 |
+| 260225 | [결정] SemgrepScanner Export: Pipeline이 Mock 여부를 몰라도 되도록 MockSemgrepScanner를 SemgrepScanner로 export |
+| 260225 | [결정] 예외 처리 방식: 파일 부재/파싱 에러는 빈 ScanResult 반환, 지원하지 않는 언어 입력은 ValueError 발생 |
+| 260225 | [결정] SBOMScanner 탐색 범위: requirements.txt는 항상 PROJECT_ROOT 기준으로 고정 탐색 |
+| 260225 | Step 4 완료: Analyzer (L2) 구현 및 API 연동 |
+| 260225 | [결정] Claude API 키 부재로 기본 Analyzer를 Gemini API로 교체 |
+| 260225 | [결정] LLMAnalyzer를 ClaudeAnalyzer로 이름 변경 후 보존 |
+| 260225 | [결정] GeminiAnalyzer 추가 및 AnalyzerFactory 구현 (.env LLM_PROVIDER 값으로 동적 선택) |
+| 260225 | [결정] 현재 기본값: LLM_PROVIDER=gemini, 추후 claude로 값만 변경 시 교체 완료 |
+| 260225 | [이슈] Gemini 모델: gemini-2.5-flash 사용 (gemini-1.5-pro 지정 시 라이브러리 자동 처리 문제) |
+| 260225 | [이슈] google-generativeai 지원 종료 경고 발생 → 추후 google-genai 패키지로 마이그레이션 필요 |
+| 260225 | 다음 단계: Step 5 (Pipeline 구현) |

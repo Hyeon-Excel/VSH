@@ -47,3 +47,28 @@ Repository 레이어는 상위 레이어가 데이터의 물리적 저장소에 
 1. `BaseRepository` 인터페이스를 상속받는 새로운 클래스(예: `ChromaRepo`)를 구현합니다.
 2. `PipelineFactory` 등 객체를 조립하는 부분에서 `MockRepo` 대신 `ChromaRepo`를 주입하도록 설정만 변경합니다.
 3. 상위 레이어(`Pipeline`, `Tools`)의 비즈니스 로직 코드는 일절 수정하지 않아도 동작이 유지됩니다.
+
+---
+
+## L1 Detection Flow (Step 3)
+
+보안 스캔은 세 가지 서로 다른 계층에서 동시에 진행됩니다.
+
+1. **입력**: 소스 파일 경로 (`.py`)
+2. **실행**:
+   - **SemgrepScanner**: 파일 라인별 문자열 패턴 매칭 → `ScanResult`
+   - **TreeSitterScanner**: AST 파싱 후 함수 호출 노드 정규식 매칭 → `ScanResult`
+   - **SBOMScanner**: 루트의 `requirements.txt` 내 취약 패키지 대조 → `ScanResult`
+3. **통합**: 각 스캐너는 독립적인 `ScanResult` 객체를 반환하며, 이는 나중에 `Pipeline` 레이어에서 하나로 통합(merge)됩니다 (Step 5 구현 예정).
+
+### Real Semgrep 교체 전략 (Migration)
+나중에 Windows 환경이 아닌 곳에서 실제 Semgrep을 사용할 경우:
+- `modules/scanner/semgrep_scanner.py` 구현 (CLI 호출 방식).
+- `modules/__init__.py` 수정:
+  ```python
+  # 기존
+  from .scanner.mock_semgrep_scanner import MockSemgrepScanner as SemgrepScanner
+  # 변경
+  from .scanner.semgrep_scanner import SemgrepScanner
+  ```
+- 이 변경만으로 나머지 모든 시스템(`Pipeline`, `Tools`)은 수정 없이 실제 Semgrep을 사용하게 됩니다.

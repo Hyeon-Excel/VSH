@@ -38,8 +38,28 @@
 - `KNOWLEDGE_PATH`: `mock_db/knowledge.json` (지식 베이스 경로)
 - `FIX_PATH`: `mock_db/kisa_fix.json` (수정 가이드 경로)
 - `MOCK_DB_DIR`: `mock_db/` 폴더 절대 경로
+- `PROJECT_ROOT`: 프로젝트 루트 디렉토리 (`pathlib.Path`)
 
 ### Environment Variables (.env)
 - `LOG_PATH`: 분석 결과 로그가 저장되는 JSON 파일 경로 (기본값: `mock_db/log.json`)
 - `ANTHROPIC_API_KEY`: Claude API 연동을 위한 키
 - `DASHBOARD_PORT`: 대시보드 서버 포트 (기본값: 3000)
+
+---
+
+## Scanner Detection Logic
+
+### VULNERABLE_PACKAGES (config.py)
+SBOMScanner에서 대조하는 취약 패키지 DB 구조입니다.
+- `package_name`: (key) 패키지 소문자 이름
+- `vulnerable_below`: 취약한 버전의 상한선 (이 버전 미만이면 취약)
+- `cve`: 관련 CVE 식별자
+
+### 탐지 방식 차이
+1. **SemgrepScanner (문자열 매칭)**: 소스 코드를 한 줄씩 읽으며 정규표현식 패턴이 존재하는지 검사합니다.
+2. **TreeSitterScanner (AST 파싱)**: 코드를 구조적으로 분석하여 '함수 호출(Call Node)' 구문에서만 패턴을 검사하여 오탐을 줄입니다.
+3. **SBOMScanner (SBOM 대조)**: 패키지 의존성 파일(`requirements.txt`)의 버전을 `VULNERABLE_PACKAGES`와 비교하여 취약한 라이브러리 사용을 탐지합니다.
+
+### SBOM 탐지 예시 (Vulnerability 필드)
+- `cwe_id`: "CWE-829" (Inclusion of Functionality from Untrusted Control Sphere)
+- `severity`: "HIGH"
