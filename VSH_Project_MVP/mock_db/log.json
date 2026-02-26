@@ -8,7 +8,7 @@
     "code_snippet": "subprocess.run(user_input, shell=True)",
     "original_code": "subprocess.run(user_input, shell=True)",
     "fixed_code": "import shlex\ncommand_and_args = shlex.split(user_input)\nsubprocess.run(command_and_args)",
-    "status": "pending"
+    "status": "accepted"
   },
   {
     "issue_id": "test_vuln.py_CWE-829_1",
@@ -19,6 +19,6 @@
     "code_snippet": "requests==2.9.0",
     "original_code": "requests==2.9.0",
     "fixed_code": "requests>=2.31.0",
-    "status": "pending"
+    "status": "dismissed"
   }
 ]

@@ -1,6 +1,6 @@
 # PROGRESS.md — 개발 진행 상태
 
-## 현재 단계: Step 7 준비 중
+## 현재 단계: Step 8 준비 중
 
 ---
 
@@ -15,7 +15,7 @@
 | 4 | Analyzer (L2) | 완료 | 260225 |
 | 5 | Pipeline | 완료 | 260225 |
 | 6 | MCP 툴 등록 | 완료 | 260225 |
-| 7 | Dashboard | 대기 | - |
+| 7 | Dashboard | 완료 | 260225 |
 | 8 | E2E 테스트 | 대기 | - |
 
 ---
@@ -60,10 +60,10 @@
 - [x] update_status 툴 호출 → 상태 변경 및 검증 확인
 
 ### Step 7 — Dashboard
-- [ ] localhost:3000 접속 확인
-- [ ] 분석 결과 화면 표시 확인
-- [ ] Accept 클릭 → 파일 수정 확인
-- [ ] Dismiss 클릭 → 로그 기록 확인
+- [x] localhost:3000 접속 확인
+- [x] 분석 결과 화면 표시 확인
+- [x] Accept 클릭 → 상태 업데이트 및 코드 복사 확인
+- [x] Dismiss 클릭 → 로그 기록 확인
 
 ### Step 8 — E2E 테스트
 - [ ] 취약한 파일 → 대시보드 결과 → Accept → 파일 수정
@@ -81,7 +81,7 @@
 | 250225 | 대시보드 포트: 3000 |
 | 250225 | 프로젝트 루트: VSH_Project_MVP |
 | 260225 | Step 0 완료: 프로젝트 구조 세팅, 의존성 설치, 레이어별 __init__.py 및 클래스 스켈레톤 작성 |
-| 260225 | Step 1 완료: Domain Model 구현 (Pydantic 채택 - 데이터 검증 및 직렬화 용이성), 다음: Repository + Mock DB |
+| 260225 | Step 1 완료: Domain Model 구현 (Pydantic 채택), 다음: Repository + Mock DB |
 | 260225 | Step 2 완료: Repository Layer 구현 및 Mock DB 연동 |
 | 260225 | [결정] BaseRead/WriteRepository 분리: LSP 위반 방지 및 읽기 전용 데이터의 무결성 보장 |
 | 260225 | [결정] find_by_id() 반환값: 항목 부재 시 None 반환 ({} 반환 시 존재 여부 확인 로직 모호성 제거) |
@@ -109,6 +109,11 @@
 | 260225 | [결정] pipeline.log_repo 직접 참조 확정: 툴 호출 간 데이터 일관성 보장을 위해 동일한 인스턴스 공유 |
 | 260225 | [결정] 툴 반환 형식 확정: LLM 가독성 및 한글 보존을 위해 `json.dumps(..., ensure_ascii=False, indent=2)` 적용 |
 | 260225 | [결정] update_status 존재하지 않는 issue_id 처리: 예외를 던지지 않고 명확한 `error` JSON 응답 반환 |
-| 260225 | [결정] L3 추가 확장성 고려: 기존 3개 툴 수정 없이 `generate_report` 툴만 새로 추가하도록 설계 |
 | 260225 | [결정] Pipeline Fail Fast 원칙: 초기화 실패 시 예외를 던져 서버가 시작되지 않도록 처리 |
-| 260225 | 다음 단계: Step 7 (Dashboard - FastAPI) |
+| 260225 | Step 7 완료: Dashboard Layer 구현 및 사전 작업 완료 |
+| 260225 | [사전 작업] `analysis_pipeline.py` 수정: `LogRepo` 저장 형식에 `original_code`, `fixed_code` 필드 추가 (UI 처리용) |
+| 260225 | [결정] Accept 방식 확정: DB 상태 업데이트(`accepted`) 후 AI 제안 코드를 클립보드에 자동 복사하는 안전한 가이드 방식 채택 |
+| 260225 | [결정] 클립보드 폴백: 브라우저 권한 문제 등으로 복사 실패 시 `textarea`를 노출하여 수동 복사 유도 |
+| 260225 | [결정] 서버 분리 운영: MCP 서버(AI 에이전트용)와 Dashboard 서버(개발자용)의 책임을 명확히 분리 |
+| 260225 | [결정] 데이터 공유 방식: `MockLogRepo`가 파일 기반(Persistent)으로 동작하므로, 두 서버가 인스턴스를 각각 생성해도 `log.json`을 통해 실시간 동기화됨 |
+| 260225 | 다음 단계: Step 8 (E2E 테스트) |

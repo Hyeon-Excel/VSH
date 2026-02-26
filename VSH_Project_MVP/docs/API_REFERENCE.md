@@ -104,8 +104,6 @@ AST(Abstract Syntax Tree) 구문 분석 기반 스캐너입니다.
 - **Method**: `scan()` - `PROJECT_ROOT/requirements.txt`를 읽어 취약한 버전의 패키지가 포함되었는지 검사합니다.
 - **Version Logic**: `packaging.version` 모듈을 사용하여 의미론적 버전 비교를 수행합니다.
 
-**참고**: `modules/__init__.py`에서 `MockSemgrepScanner`는 `SemgrepScanner`라는 이름으로 export됩니다. 이는 상위 레이어인 Pipeline이 구현 세부 사항(Mock 여부)에 의존하지 않도록 하기 위함입니다.
-
 ---
 
 ## Pipeline Layer (pipeline/)
@@ -115,48 +113,46 @@ AST(Abstract Syntax Tree) 구문 분석 기반 스캐너입니다.
 - `run(file_path: str) -> dict`: 단일 파일에 대한 보안 분석 파이프라인 전체를 실행합니다.
 
 ### AnalysisPipeline
-실제 분석 흐름을 오케스트레이션하는 클래스입니다. 생성자를 통해 스캐너, 분석기, 레포지토리를 주입받습니다.
+실제 분석 흐름을 오케스트레이션하는 클래스입니다. 생성자를 통해 스캐너, 분석기, 레포지토리(Read/Write)를 주입받습니다.
 - **Method**: `run(file_path: str) -> dict`
-  - **인자**: 스캔 대상 파일 경로
-  - **반환값**: `file_path`, `scan_results` (dict list), `fix_suggestions` (dict list), `is_clean` (bool) 키를 포함하는 직렬화 가능한 딕셔너리.
-  - **전체 흐름**: Scanner 병렬 실행 -> 중복 제거 -> (취약점 발견 시) DB 조회 및 Analyzer 실행 -> (위협 판정 시) LogRepo에 저장 -> 최종 JSON 직렬화 포맷 반환.
-- **Method**: `_deduplicate(findings: List[Vulnerability]) -> List[Vulnerability]`
-  - `@staticmethod`로 선언.
-  - `cwe_id`와 `line_number` 조합을 고유 키로 사용하여 여러 스캐너의 중복된 탐지 결과를 제거합니다.
-
-### PipelineFactory
-파이프라인의 모든 의존성을 생성하고 조립하는 역할을 합니다.
-- **Method**: `create() -> BasePipeline`
-  - 싱글톤 형태의 `Mock Repo`들(Knowledge, Fix, Log)을 생성.
-  - 3종의 스캐너(`Semgrep`, `TreeSitter`, `SBOM`) 초기화.
-  - `.env`의 `LLM_PROVIDER` 값을 읽어 적절한 `Analyzer` 인스턴스 생성 및 `api_key` 검증 (누락 시 `ValueError`).
-  - 생성된 모든 의존성을 `AnalysisPipeline`에 주입하여 반환.
+  - **전체 흐름**: 스캐너 실행 -> 중복 제거 -> Analyzer 실행 -> **결과를 `LogRepo`에 영구 저장(original/fixed code 포함)** -> 결과 반환.
 
 ---
 
-## Interface Layer (tools/server.py)
+## Dashboard API (dashboard/app.py)
 
-FastMCP를 통해 Claude/Cursor 등의 LLM 클라이언트가 호출할 수 있는 인터페이스입니다. 툴 내부에 비즈니스 로직을 포함하지 않고 Pipeline 및 Repository에 위임합니다.
+FastAPI를 통해 개발자가 브라우저에서 분석 결과를 리뷰하고 조치할 수 있는 인터페이스를 제공합니다.
 
-### `scan_file(file_path: str) -> str`
-지정한 파일을 보안 스캔하고 분석 결과를 반환합니다.
-- **입력**: `file_path` (스캔 대상 경로)
-- **반환 JSON 구조**: 파이프라인 실행 결과 (`file_path`, `scan_results`, `fix_suggestions`, `is_clean`)
-- **예외 처리**: 예외 발생 시 `{"error": "에러 메시지"}` 형태의 JSON 반환.
+### `GET /`
+- **설명**: 대시보드 메인 HTML 페이지(`index.html`)를 반환합니다.
 
-### `get_report() -> str`
-저장된 모든 보안 진단 로그를 조회합니다.
-- **입력**: 없음
-- **반환 JSON 구조**: `{"logs": [{로그 데이터...}], "total": N}`
-- **예외 처리**: 예외 발생 시 `{"error": "에러 메시지"}` 반환.
+### `GET /api/logs`
+- **설명**: `log.json`에 저장된 모든 보안 진단 이력을 조회합니다.
+- **반환 구조**:
+  ```json
+  {
+    "logs": [
+      {
+        "issue_id": "...",
+        "cwe_id": "...",
+        "severity": "...",
+        "original_code": "...",
+        "fixed_code": "...",
+        "status": "pending/accepted/dismissed",
+        "...": "..."
+      }
+    ],
+    "total": 10
+  }
+  ```
 
-### `update_status(issue_id: str, status: str) -> str`
-특정 취약점의 상태를 '수정 승인' 또는 '무시'로 변경합니다.
-- **입력**: 
-  - `issue_id`: 대상 이슈 ID
-  - `status`: 변경할 상태값 (`accepted` 또는 `dismissed`만 허용)
-- **반환 JSON 구조**: 성공 시 `{"issue_id": "...", "status": "...", "message": "..."}`
-- **예외 및 에러 처리**:
-  - 존재하지 않는 `issue_id` 입력 시: `{"error": "Issue not found: ..."}`
-  - 잘못된 `status` 입력 시: `{"error": "Invalid status..."}`
-  - 기타 시스템 예외 발생 시: `{"error": "에러 메시지"}`
+### `POST /api/logs/{issue_id}/accept`
+- **설명**: 사용자가 수정을 승인했음을 표시하고 AI 제안 코드를 반환합니다.
+- **처리**: `LogRepo` 상태를 `accepted`로 변경.
+- **반환**: `{"issue_id": "...", "status": "accepted", "fixed_code": "...", "message": "..."}`
+- **에러**: ID가 없으면 404, 시스템 오류 시 500 반환.
+
+### `POST /api/logs/{issue_id}/dismiss`
+- **설명**: 사용자가 해당 이슈를 오탐으로 판단하여 무시했음을 표시합니다.
+- **처리**: `LogRepo` 상태를 `dismissed`로 변경.
+- **반환**: `{"issue_id": "...", "status": "dismissed", "message": "..."}`
