@@ -27,6 +27,13 @@
   - registry_check 결과(존재/미존재/오류)
   - osv_check 결과(CVE 목록/없음/오류)
 
+### L1 재사용 계약
+
+- `findings[]`는 L2의 기본 입력 계약이며, 필드 의미를 변경하지 않는다.
+- `import_candidates`는 Registry/OSV 검증 대상으로 사용한다.
+- L2는 L1 결과를 덮어쓰지 않고 `enriched_findings`로 확장한다.
+- L1의 `annotation_patch`는 L2에서 "근거/CVE/수정 코드"가 보강된 형태로 확장 가능하다.
+
 ---
 
 ## 2. RAG 지식 베이스

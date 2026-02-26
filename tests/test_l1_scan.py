@@ -27,6 +27,7 @@ def test_l1_detects_python_sqli() -> None:
     assert response.errors == []
     assert len(response.findings) >= 1
     assert any(finding.rule_id == "vsh.python.sqli.fstring" for finding in response.findings)
+    assert any(candidate.package_name == "sqlite3" for candidate in response.import_candidates)
 
 
 def test_l1_detects_js_xss() -> None:
@@ -68,3 +69,4 @@ def test_l1_returns_no_findings_for_safe_samples() -> None:
     assert js_response.errors == []
     assert python_response.findings == []
     assert js_response.findings == []
+    assert any(candidate.package_name == "sqlite3" for candidate in python_response.import_candidates)

@@ -1,66 +1,41 @@
 # L1 Test Result
 
-- 작성 시각: 2026-02-24 13:48:01 KST
+- 작성 시각: 2026-02-26 15:56:22 KST
 - 대상 프로젝트: `/Users/hyeonexcel/Documents/Workspace/VSH`
-- 검토 대상: L1 스캔/정규화/주석 패치/서비스 오케스트레이션
+- 커밋 SHA: `c28d40b`
 
-## 1. 검토 범위
+## 1. 판정 요약
 
-- 코드
-  - `src/vsh/l1_hot/semgrep_runner.py`
-  - `src/vsh/l1_hot/normalize.py`
-  - `src/vsh/l1_hot/annotate.py`
-  - `src/vsh/l1_hot/service.py`
-- 룰셋
-  - `rules/l1/python.yml`
-  - `rules/l1/javascript.yml`
-  - `rules/l1/secrets.yml`
-- 테스트
-  - `tests/test_l1_scan.py`
-  - `tests/test_l1_patch.py`
+- 전체 판정: PASS
+- Pytest 통과율: 17/17 (100.0%)
+- Smoke 테스트: PASS
+- 성능 게이트: PASS
 
-## 2. 이번 검토에서 반영한 사항
+## 2. 성능 지표(D4)
 
-- Semgrep CLI 결과에 `engine=semgrep-cli` 메타를 명시하도록 보강
-- L1 테스트 자동화 스크립트 추가
-  - `scripts/test_l1_pytest.sh`
-  - `scripts/test_l1_smoke.sh`
-  - `scripts/test_l1_all.sh`
-- `test_l1_pytest.sh`가 실행 환경별로 pytest 가능한 Python 인터프리터를 자동 선택하도록 보강
+- cache miss p95: 979.38 ms (기준 <= 2500 ms)
+- cache hit p95: 0.22 ms (기준 <= 200 ms)
+- cache miss p50: 957.32 ms
+- cache hit p50: 0.13 ms
 
-## 3. 실행한 테스트
+## 3. 실패 케이스
 
-### 3.1 통합 실행
+- 없음
 
-```bash
-./scripts/test_l1_all.sh
-```
+## 4. 미구현/잔여 리스크
 
-실행 로그:
+- TypeScript alias/multiline import 추출 확장 케이스 추가 필요
+- GitHub branch protection에서 `L1 CI Gate / L1 Tests`를 required check로 지정 필요
+- 패키지 실존성/타이포스쿼팅 검증은 L2 구현 연동 필요
 
-- `/Users/hyeonexcel/Documents/Workspace/VSH/artifacts/test-results/l1/l1_test_20260224_134744.log`
+## 5. 실행 산출물
 
-### 3.2 세부 결과
+- 통합 로그: `/Users/hyeonexcel/Documents/Workspace/VSH/artifacts/test-results/l1/l1_test_20260226_155548.log`
+- Pytest 로그: `/Users/hyeonexcel/Documents/Workspace/VSH/artifacts/test-results/l1/l1_pytest_20260226_155548.log`
+- Smoke 로그: `/Users/hyeonexcel/Documents/Workspace/VSH/artifacts/test-results/l1/l1_smoke_20260226_155548.log`
+- 성능 JSON: `/Users/hyeonexcel/Documents/Workspace/VSH/artifacts/test-results/l1/l1_perf_20260226_155548.json`
 
-- Pytest L1 테스트
-  - 결과: `5 passed`
-  - 항목:
-    - Python SQLi 탐지
-    - JavaScript XSS 탐지
-    - 안전 샘플 무탐지
-    - annotation patch unified diff 형식 검증
-    - 무탐지 시 빈 patch 검증
-- Smoke 테스트
-  - Semgrep CLI 경로 탐지 성공
-  - Python 샘플 탐지 성공 (`python_findings=1`)
-  - JavaScript 샘플 탐지 성공 (`js_findings=1`)
-  - 강제 fallback 경로 탐지 성공 (`fallback_findings=1`)
+## 6. 기준 문서
 
-## 4. 결론
-
-- L1 MVP는 현재 기준에서 정상 동작함
-  - 룰 기반 탐지 동작
-  - Finding 정규화 동작
-  - Annotation patch 생성 동작
-  - 서비스 레벨 오케스트레이션 동작
-- Semgrep CLI가 존재할 때 `semgrep-cli` 경로, 실패/강제 상황에서는 `fallback` 경로가 동작함
+- `docs/layer1.md`
+- `docs/roadmap.md`

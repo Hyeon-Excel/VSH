@@ -39,6 +39,8 @@ response = service.scan_annotate(
 assert response.errors == [], f"L1 service errors: {response.errors}"
 assert len(response.findings) >= 1, "L1 should detect at least one Python SQLi finding."
 assert response.annotation_patch.strip(), "L1 should return non-empty annotation patch."
+assert response.import_candidates, "L1 should extract import candidates."
+assert any(c.package_name == "sqlite3" for c in response.import_candidates), "sqlite3 import should be extracted."
 
 # 2) ensure semgrep-cli path works when semgrep binary is available
 runner = SemgrepRunner()
@@ -75,4 +77,5 @@ print(f"- python_engine: {python_engine}")
 print(f"- python_findings: {len(python_result.get('results', []))}")
 print(f"- js_findings: {len(js_result.get('results', []))}")
 print(f"- fallback_findings: {len(fallback_result.get('results', []))}")
+print(f"- python_import_candidates: {len(response.import_candidates)}")
 PY

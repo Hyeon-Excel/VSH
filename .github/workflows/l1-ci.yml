@@ -1,0 +1,43 @@
+name: L1 CI Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  l1-gate:
+    name: L1 Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run L1 gate
+        run: bash scripts/test_l1_all.sh
+
+      - name: Upload L1 artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l1-test-artifacts
+          path: |
+            L1-test-result.md
+            artifacts/test-results/l1/*

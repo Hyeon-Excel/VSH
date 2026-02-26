@@ -15,4 +15,11 @@ cd "$ROOT_DIR"
 if ! "$PYTHON_BIN" -c "import pytest" >/dev/null 2>&1; then
   PYTHON_BIN="python3"
 fi
-"$PYTHON_BIN" -m pytest -q tests/test_l1_scan.py tests/test_l1_patch.py
+"$PYTHON_BIN" -m pytest -q \
+  tests/test_l1_scan.py \
+  tests/test_l1_patch.py \
+  tests/test_l1_patch_apply.py \
+  tests/test_l1_tree_sitter.py \
+  tests/test_l1_resilience.py \
+  tests/test_l1_cache.py \
+  tests/test_l1_vuln_samples.py

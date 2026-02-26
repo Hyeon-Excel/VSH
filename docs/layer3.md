@@ -21,6 +21,12 @@
 - report.json
 - sbom 파일(선택: SPDX/CycloneDX/Syft JSON)
 
+### L1/L2 재사용 계약
+
+- L3는 L1/L2 finding을 baseline으로 받아 "추가/병합"한다.
+- `finding_id`를 유지해 탐지 -> 보강 -> 보고 흐름을 추적 가능하게 만든다.
+- L2의 evidence/verification 결과를 L3 리포트의 근거 섹션에 재사용한다.
+
 ---
 
 ## 2. 심층 정적 분석(SAST)

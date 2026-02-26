@@ -92,6 +92,13 @@ class ActionLog(BaseStrictModel):
     notes: str | None = None
 
 
+class SupplyChainCandidate(BaseStrictModel):
+    package_name: str
+    line: int | None = Field(default=None, ge=1)
+    source_type: str = "import"
+    extraction_method: str = "tree-sitter"
+
+
 class L1ScanAnnotateRequest(BaseStrictModel):
     code: str
     language: str
@@ -101,6 +108,7 @@ class L1ScanAnnotateRequest(BaseStrictModel):
 
 class L1ScanAnnotateResponse(BaseStrictModel):
     findings: list[Finding] = Field(default_factory=list)
+    import_candidates: list[SupplyChainCandidate] = Field(default_factory=list)
     annotation_patch: str = ""
     timing_ms: int = 0
     errors: list[str] = Field(default_factory=list)
