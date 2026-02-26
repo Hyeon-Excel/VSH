@@ -1,6 +1,6 @@
 # PROGRESS.md — 개발 진행 상태
 
-## 현재 단계: Step 6 준비 중
+## 현재 단계: Step 7 준비 중
 
 ---
 
@@ -14,7 +14,7 @@
 | 3 | Scanner (L1) | 완료 | 260225 |
 | 4 | Analyzer (L2) | 완료 | 260225 |
 | 5 | Pipeline | 완료 | 260225 |
-| 6 | MCP 툴 등록 | 대기 | - |
+| 6 | MCP 툴 등록 | 완료 | 260225 |
 | 7 | Dashboard | 대기 | - |
 | 8 | E2E 테스트 | 대기 | - |
 
@@ -54,9 +54,10 @@
 - [x] PipelineFactory 인스턴스 생성 확인
 
 ### Step 6 — MCP 툴 등록
-- [ ] mcp_server.py 실행 오류 없음
-- [ ] validate_code 툴 호출 → 파이프라인 실행 확인
-- [ ] get_results 툴 호출 → log.json 반환 확인
+- [x] mcp_server.py 실행 오류 없음 (Fail Fast 적용)
+- [x] scan_file 툴 호출 → 파이프라인 실행 확인
+- [x] get_report 툴 호출 → log.json 반환 확인
+- [x] update_status 툴 호출 → 상태 변경 및 검증 확인
 
 ### Step 7 — Dashboard
 - [ ] localhost:3000 접속 확인
@@ -102,4 +103,12 @@
 | 260225 | [결정] run() 반환 타입: 모든 값을 직렬화 가능한 dict 및 리스트 구조로 반환 (도메인 모델 객체 직접 반환 금지) |
 | 260225 | [결정] PipelineFactory 의존성 조립: 파이프라인 생성 시 필요한 모든 의존성(Scanner, Analyzer, Repo)을 외부에서 생성 후 주입 (DI 패턴 적용) |
 | 260225 | [결정] LogRepo 저장 형식: `issue_id`, `file_path`, `cwe_id`, `severity`, `line_number`, `code_snippet`, `status("pending")` 포함 확정 |
-| 260225 | 다음 단계: Step 6 (MCP 툴 등록) |
+| 260225 | Step 6 완료: MCP 툴 등록 및 Interface Layer 구현 |
+| 260225 | [결정] MCP 툴 3개 등록 확정 (`scan_file`, `get_report`, `update_status`) |
+| 260225 | [결정] load_dotenv() 호출 순서 확정: `PipelineFactory.create()` 이전에 반드시 호출하여 환경변수 누락 방지 |
+| 260225 | [결정] pipeline.log_repo 직접 참조 확정: 툴 호출 간 데이터 일관성 보장을 위해 동일한 인스턴스 공유 |
+| 260225 | [결정] 툴 반환 형식 확정: LLM 가독성 및 한글 보존을 위해 `json.dumps(..., ensure_ascii=False, indent=2)` 적용 |
+| 260225 | [결정] update_status 존재하지 않는 issue_id 처리: 예외를 던지지 않고 명확한 `error` JSON 응답 반환 |
+| 260225 | [결정] L3 추가 확장성 고려: 기존 3개 툴 수정 없이 `generate_report` 툴만 새로 추가하도록 설계 |
+| 260225 | [결정] Pipeline Fail Fast 원칙: 초기화 실패 시 예외를 던져 서버가 시작되지 않도록 처리 |
+| 260225 | 다음 단계: Step 7 (Dashboard - FastAPI) |

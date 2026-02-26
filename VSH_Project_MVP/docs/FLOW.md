@@ -82,3 +82,22 @@ Repository 레이어는 상위 레이어가 데이터의 물리적 저장소에 
   from .scanner.semgrep_scanner import SemgrepScanner
   ```
 - 이 변경만으로 나머지 모든 시스템(`Pipeline`, `Tools`)은 수정 없이 실제 Semgrep을 사용하게 됩니다.
+
+---
+
+## MCP Tool Interface Flow (Step 6)
+
+`tools/server.py`는 클라이언트(LLM)와 내부 파이프라인을 잇는 안전한 중계 역할을 합니다.
+
+### 서버 초기화 순서
+1. **`load_dotenv()`**: 가장 먼저 환경변수를 로드합니다.
+2. **`PipelineFactory.create()`**: 환경변수를 바탕으로 Pipeline 인스턴스를 생성합니다. (API 키 부재 시 Fail-Fast로 즉각 실패)
+3. **`pipeline.log_repo` 참조**: 데이터 일관성 유지를 위해 생성된 파이프라인 내부의 리포지토리를 별도로 할당합니다.
+
+### 툴 호출 흐름
+1. **`scan_file(file_path)`**: 클라이언트 요청 -> `pipeline.run(file_path)` 호출 -> 결과 dict를 JSON 포맷으로 직렬화하여 반환.
+2. **`get_report()`**: 클라이언트 요청 -> `log_repo.find_all()` 호출 -> 결과 리스트를 JSON 포맷으로 감싸서 반환.
+3. **`update_status(issue_id, status)`**: 클라이언트 요청 -> `status` 유효성 검사 -> `issue_id` 존재 확인 -> `log_repo.update_status()` 실행 -> 성공/실패 여부를 JSON으로 반환.
+
+### 예외 처리 흐름
+모든 MCP 툴은 처리 중 예외(Exception)가 발생하면 시스템 밖으로 에러를 던지지 않고, 클라이언트와의 통신 유지를 위해 즉시 예외를 캐치하여 `{"error": "에러 메시지"}` 형태의 구조화된 JSON 문자열을 반환합니다.

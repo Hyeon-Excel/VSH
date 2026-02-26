@@ -1,18 +1,13 @@
 [
   {
-    "issue_id": "issue-001",
-    "file_path": "test.py",
-    "cwe_id": "CWE-78",
-    "severity": "HIGH",
-    "status": "accepted"
-  },
-  {
     "issue_id": "test_vuln.py_CWE-78_5",
     "file_path": "test_vuln.py",
     "cwe_id": "CWE-78",
     "severity": "HIGH",
     "line_number": 5,
     "code_snippet": "subprocess.run(user_input, shell=True)",
+    "original_code": "subprocess.run(user_input, shell=True)",
+    "fixed_code": "import shlex\ncommand_and_args = shlex.split(user_input)\nsubprocess.run(command_and_args)",
     "status": "pending"
   },
   {
@@ -22,15 +17,8 @@
     "severity": "HIGH",
     "line_number": 1,
     "code_snippet": "requests==2.9.0",
-    "status": "pending"
-  },
-  {
-    "issue_id": "test_clean.py_CWE-829_1",
-    "file_path": "test_clean.py",
-    "cwe_id": "CWE-829",
-    "severity": "HIGH",
-    "line_number": 1,
-    "code_snippet": "requests==2.9.0",
+    "original_code": "requests==2.9.0",
+    "fixed_code": "requests>=2.31.0",
     "status": "pending"
   }
 ]

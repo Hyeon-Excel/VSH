@@ -131,3 +131,32 @@ AST(Abstract Syntax Tree) 구문 분석 기반 스캐너입니다.
   - 3종의 스캐너(`Semgrep`, `TreeSitter`, `SBOM`) 초기화.
   - `.env`의 `LLM_PROVIDER` 값을 읽어 적절한 `Analyzer` 인스턴스 생성 및 `api_key` 검증 (누락 시 `ValueError`).
   - 생성된 모든 의존성을 `AnalysisPipeline`에 주입하여 반환.
+
+---
+
+## Interface Layer (tools/server.py)
+
+FastMCP를 통해 Claude/Cursor 등의 LLM 클라이언트가 호출할 수 있는 인터페이스입니다. 툴 내부에 비즈니스 로직을 포함하지 않고 Pipeline 및 Repository에 위임합니다.
+
+### `scan_file(file_path: str) -> str`
+지정한 파일을 보안 스캔하고 분석 결과를 반환합니다.
+- **입력**: `file_path` (스캔 대상 경로)
+- **반환 JSON 구조**: 파이프라인 실행 결과 (`file_path`, `scan_results`, `fix_suggestions`, `is_clean`)
+- **예외 처리**: 예외 발생 시 `{"error": "에러 메시지"}` 형태의 JSON 반환.
+
+### `get_report() -> str`
+저장된 모든 보안 진단 로그를 조회합니다.
+- **입력**: 없음
+- **반환 JSON 구조**: `{"logs": [{로그 데이터...}], "total": N}`
+- **예외 처리**: 예외 발생 시 `{"error": "에러 메시지"}` 반환.
+
+### `update_status(issue_id: str, status: str) -> str`
+특정 취약점의 상태를 '수정 승인' 또는 '무시'로 변경합니다.
+- **입력**: 
+  - `issue_id`: 대상 이슈 ID
+  - `status`: 변경할 상태값 (`accepted` 또는 `dismissed`만 허용)
+- **반환 JSON 구조**: 성공 시 `{"issue_id": "...", "status": "...", "message": "..."}`
+- **예외 및 에러 처리**:
+  - 존재하지 않는 `issue_id` 입력 시: `{"error": "Issue not found: ..."}`
+  - 잘못된 `status` 입력 시: `{"error": "Invalid status..."}`
+  - 기타 시스템 예외 발생 시: `{"error": "에러 메시지"}`

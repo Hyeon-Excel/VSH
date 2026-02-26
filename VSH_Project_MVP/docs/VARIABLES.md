@@ -27,9 +27,11 @@
 - `status`: 현재 처리 상태 (pending / accepted / dismissed)
 - `cwe_id`: 탐지된 취약점 유형
 - `severity`: 취약점 심각도
+- `line_number`: 코드 라인 번호
+- `code_snippet`: 취약점이 의심되는 원본 코드 라인
 
 ### Status Allowed Values
-`MockLogRepo.update_status`에서 허용하는 값:
+`MockLogRepo.update_status` 및 MCP 툴에서 허용하는 값:
 - **pending**: 분석 직후의 기본 상태 (대시보드 표시용)
 - **accepted**: 사용자가 수정을 승인한 상태 (파일 수정 적용 대상)
 - **dismissed**: 사용자가 오탐으로 판단하여 무시한 상태 (로그에는 남으나 대시보드에서는 필터링 가능)
@@ -68,25 +70,22 @@ SBOMScanner에서 대조하는 취약 패키지 DB 구조입니다.
 
 ---
 
-## Pipeline & Orchestration
+## Pipeline & Interface (JSON Outputs)
 
-### Pipeline 반환 Dict 구조
-`Pipeline.run()` 호출 시 MCP 툴과 Dashboard가 바로 사용할 수 있도록 직렬화된 딕셔너리 구조를 반환합니다.
-- `file_path` (str): 스캔한 파일의 절대/상대 경로.
-- `scan_results` (list): 발견된 전체 취약점 (중복 제거됨, `Vulnerability` 객체의 필드를 dict로 변환).
-- `fix_suggestions` (list): AI가 실제 위협으로 판단하고 수정안을 제공한 내역 (`FixSuggestion` 객체의 필드를 dict로 변환).
-- `is_clean` (bool): `scan_results`가 비어있으면 `True`.
+### MCP 툴 `scan_file` 반환 구조
+- `file_path` (str)
+- `scan_results` (list): 중복 제거된 취약점 상세 정보.
+- `fix_suggestions` (list): AI가 분석한 수정안 내역.
+- `is_clean` (bool): 취약점 존재 여부 플래그.
 
-### LogRepo 저장 데이터 구조
-분석이 끝나고 `LogRepo`에 저장(또는 덮어쓰기)되는 각 항목의 구조입니다. Dashboard 표시에 필요한 정보가 모두 포함됩니다.
-- `issue_id`: 고유 ID (`{file_path}_{cwe_id}_{line_number}`)
-- `file_path`: 대상 파일
-- `cwe_id`: 취약점 고유 번호
-- `severity`: "HIGH", "MEDIUM", "LOW"
-- `line_number`: 코드 라인 번호
-- `code_snippet`: 취약점이 의심되는 원본 코드 라인
-- `status`: 현재 상태 (`pending`)
+### MCP 툴 `get_report` 반환 구조
+- `logs` (list): `LogRepo`에 저장된 모든 분석 이력(`issue_id`, `status` 등 전체 필드).
+- `total` (int): 반환된 로그의 총 개수.
 
-### 중복 제거(Deduplication) 기준
-파이프라인 내부에서 `TreeSitterScanner`와 `SemgrepScanner`의 탐지 결과 중복을 막기 위해 사용되는 고유 식별 조합:
-- **기준**: `cwe_id` + `line_number`
+### MCP 툴 `update_status` 반환 구조
+- 성공 시: `{"issue_id": "...", "status": "...", "message": "Status updated successfully."}`
+- 실패 시 (error 응답 형식): `{"error": "에러 원인 설명"}`
+
+### JSON Serialization Configuration
+모든 MCP 툴의 반환 문자열은 AI 가독성 및 데이터 손실 방지를 위해 다음 규칙을 따릅니다.
+- `json.dumps(..., ensure_ascii=False, indent=2)`

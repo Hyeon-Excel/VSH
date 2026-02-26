@@ -94,6 +94,8 @@ class AnalysisPipeline(BasePipeline):
                         "severity": matching_vuln.severity,
                         "line_number": matching_vuln.line_number,
                         "code_snippet": matching_vuln.code_snippet,
+                        "original_code": suggestion.original_code,
+                        "fixed_code": suggestion.fixed_code,
                         "status": "pending"
                     }
                     self.log_repo.save(log_data)
