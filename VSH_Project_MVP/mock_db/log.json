@@ -1,0 +1,35 @@
+[
+  {
+    "issue_id": "tests/e2e_target.py_CWE-89_5",
+    "file_path": "tests/e2e_target.py",
+    "cwe_id": "CWE-89",
+    "severity": "HIGH",
+    "line_number": 5,
+    "code_snippet": "cursor.execute('SELECT * FROM users WHERE id = %s' % user_input)",
+    "original_code": "cursor.execute('SELECT * FROM users WHERE id = %s' % user_input)",
+    "fixed_code": "cursor.execute('SELECT * FROM users WHERE id = %s', (user_input,))",
+    "status": "pending"
+  },
+  {
+    "issue_id": "tests/e2e_target.py_CWE-798_8",
+    "file_path": "tests/e2e_target.py",
+    "cwe_id": "CWE-798",
+    "severity": "HIGH",
+    "line_number": 8,
+    "code_snippet": "SECRET_KEY = 'supersecretkey123'",
+    "original_code": "SECRET_KEY = 'supersecretkey123'",
+    "fixed_code": "import os\nSECRET_KEY = os.environ.get('APP_SECRET_KEY', 'default_fallback_key')",
+    "status": "accepted"
+  },
+  {
+    "issue_id": "tests/e2e_target.py_CWE-829_1",
+    "file_path": "tests/e2e_target.py",
+    "cwe_id": "CWE-829",
+    "severity": "HIGH",
+    "line_number": 1,
+    "code_snippet": "requests==2.9.0",
+    "original_code": "requests==2.9.0",
+    "fixed_code": "requests>=2.31.0",
+    "status": "dismissed"
+  }
+]

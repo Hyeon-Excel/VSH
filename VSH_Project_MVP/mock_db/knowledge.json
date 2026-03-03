@@ -1,0 +1,48 @@
+[  {
+    "id": "CWE-78",
+    "name": "OS Command Injection",
+    "description": "사용자 입력이 OS 명령어에 직접 전달됨",
+    "pattern": "subprocess.run.*shell=True",
+    "reference": "KISA 시큐어코딩 OS-01",
+    "severity": "HIGH"
+  },
+  {
+    "id": "CWE-89",
+    "name": "SQL Injection",
+    "description": "사용자 입력이 SQL 쿼리에 직접 삽입됨",
+    "pattern": "execute.*%s.*user_input",
+    "reference": "KISA 시큐어코딩 DB-01",
+    "severity": "HIGH"
+  },
+  {
+    "id": "CWE-79",
+    "name": "XSS",
+    "description": "사용자 입력이 HTML에 그대로 출력됨",
+    "pattern": "render.*user_input",
+    "reference": "OWASP Top 10 A03",
+    "severity": "MEDIUM"
+  },
+  {
+    "id": "CWE-22",
+    "name": "Path Traversal",
+    "description": "사용자 입력이 파일 경로에 직접 사용됨",
+    "pattern": "open.*user_input",
+    "reference": "KISA 시큐어코딩 FI-01",
+    "severity": "HIGH"
+  },
+  {
+    "id": "CWE-502",
+    "name": "Deserialization of Untrusted Data",
+    "description": "신뢰할 수 없는 데이터를 역직렬화함",
+    "pattern": "pickle.loads.*user_input",
+    "reference": "OWASP Top 10 A08",
+    "severity": "HIGH"
+  },
+  {
+    "id": "CWE-798",
+    "name": "Use of Hard-coded Credentials",
+    "description": "소스코드 내에 중요한 시크릿이나 인증 정보가 하드코딩됨",
+    "pattern": "SECRET_KEY\\s*=\\s*['\"][a-zA-Z0-9]+['\"]",
+    "reference": "KISA 시큐어코딩 AM-01",
+    "severity": "HIGH"
+  }]

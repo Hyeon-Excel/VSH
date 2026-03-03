@@ -1,0 +1,6 @@
+requests==2.9.0
+flask==2.10.0
+google-generativeai
+jinja2
+python-multipart
+pytest

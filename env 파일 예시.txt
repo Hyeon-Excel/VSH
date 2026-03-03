@@ -1,0 +1,7 @@
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+DASHBOARD_PORT=3000
+LOG_PATH=mock_db/log.json
+KNOWLEDGE_PATH=mock_db/knowledge.json
+FIX_PATH=mock_db/kisa_fix.json
