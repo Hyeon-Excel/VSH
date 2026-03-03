@@ -1,0 +1,17 @@
+pydantic<3.0.0,>=2.8.0
+
+[dev]
+pytest<9.0.0,>=8.0.0
+ruff<1.0.0,>=0.6.0
+
+[l1]
+tree-sitter<1.0.0,>=0.21.3
+
+[l1:python_version < "3.13"]
+tree-sitter-languages<2.0.0,>=1.10.2
+
+[l1:python_version >= "3.13"]
+tree-sitter-language-pack<1.0.0,>=0.13.0
+
+[mcp]
+fastmcp>=0.1.0

@@ -1,0 +1,24 @@
+{
+  "samples": 4,
+  "cache_miss_ms": {
+    "count": 12.0,
+    "p50": 885.03,
+    "p95": 909.88,
+    "max": 909.88
+  },
+  "cache_hit_ms": {
+    "count": 16.0,
+    "p50": 0.11,
+    "p95": 0.19,
+    "max": 0.19
+  },
+  "threshold_ms": {
+    "cache_miss_p95": 2500,
+    "cache_hit_p95": 200
+  },
+  "gate": {
+    "cache_miss_p95": true,
+    "cache_hit_p95": true,
+    "overall": true
+  }
+}

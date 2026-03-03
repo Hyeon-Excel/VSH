@@ -1,0 +1,24 @@
+[L1] pytest tests 시작
+.................                                                        [100%]
+17 passed in 14.27s
+
+[L1] smoke tests 시작
+L1 smoke checks passed.
+- semgrep_bin: /Users/hyeonexcel/Documents/Workspace/VSH/.venv/bin/semgrep
+- python_engine: semgrep-cli
+- python_findings: 1
+- js_findings: 1
+- fallback_findings: 1
+- python_import_candidates: 1
+
+[L1] perf tests 시작
+L1 perf checks passed.
+- cache_miss_p50_ms: 957.32
+- cache_miss_p95_ms: 979.38
+- cache_hit_p50_ms: 0.13
+- cache_hit_p95_ms: 0.22
+- threshold_cache_miss_p95_ms: 2500
+- threshold_cache_hit_p95_ms: 200
+- perf_json: /Users/hyeonexcel/Documents/Workspace/VSH/artifacts/test-results/l1/l1_perf_20260226_155548.json
+
+[L1] 전체 테스트 완료
