@@ -5,34 +5,17 @@ from rich.table import Table
 
 from vsh.core.config import VSHConfig
 from vsh.core.models import ScanResult
-from vsh.core.utils import guess_language
-from vsh.engines.semgrep_engine import run_semgrep
-from vsh.engines.registry_engine import find_hallucinated_packages
-from vsh.engines.sbom_engine import generate_sbom
-from vsh.engines.osv_engine import scan_deps_with_osv
-from vsh.engines.reachability_engine import annotate_reachability
+from pipeline.analysis_pipeline import AnalysisPipeline
+from modules.scanner.vsh_l1_scanner import VSHL1Scanner
 from vsh.engines.report_engine import calc_score, make_inline_comment, write_markdown_report
 
 console = Console()
 
 def scan(cfg: VSHConfig) -> ScanResult:
-    lang = cfg.language or guess_language(cfg.project_root)
+    l1_scanner = VSHL1Scanner(cfg)
+    pipeline = AnalysisPipeline(scanner=l1_scanner)
 
-    findings = run_semgrep(cfg, lang)
-    findings = annotate_reachability(cfg.project_root, lang, findings)
-
-    hallucinated = find_hallucinated_packages(cfg, lang)
-
-    sbom = generate_sbom(cfg)
-    dep_vulns = scan_deps_with_osv(cfg, sbom)
-
-    result = ScanResult(
-        project=cfg.project_root.name,
-        findings=findings,
-        dep_vulns=dep_vulns,
-        hallucinated_packages=hallucinated,
-        notes=[f"language={lang}", f"sbom_source={sbom.get('source')}"]
-    )
+    result = pipeline.run_l1()
     result.score = calc_score(result.findings, result.dep_vulns, result.hallucinated_packages)
     return result
 

@@ -295,3 +295,27 @@ docker-compose up
 **Made with ❤️ by Vibe Security Team**
 
 VSH v1.0.0 | 2026-02-20
+
+## 🧱 Layered Integration (L1/L2/L3-ready)
+
+VSH now provides an architecture-compatible L1 scanner adapter for layered pipelines:
+
+- `modules/scanner/base_scanner.py`: L1 scanner contract (`scan() -> ScanResult`)
+- `modules/scanner/vsh_l1_scanner.py`: VSH L1 implementation (Semgrep + SBOM + OSV + hallucination + reachability)
+- `pipeline/analysis_pipeline.py`: orchestration entry point with explicit L1/L2/L3 boundaries
+
+### L1 Integration Steps
+
+1. Build `VSHConfig` with `project_root`, `out_dir`, and optional language.
+2. Instantiate `VSHL1Scanner(cfg)`.
+3. Inject scanner into `AnalysisPipeline(scanner=...)`.
+4. Call `pipeline.run_l1()` (or `pipeline.run()` when L2/L3 components are attached).
+
+This keeps L1 stateless and detection-only:
+
+- no report generation
+- no output file writing
+- no CLI printing
+- no LLM calls
+
+L2 (explanation/fix) and L3 (reporting/deep scan) can be attached externally via analyzer/reporter interfaces in the pipeline.
