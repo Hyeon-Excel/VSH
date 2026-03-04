@@ -295,3 +295,27 @@ docker-compose up
 **Made with ❤️ by Vibe Security Team**
 
 VSH v1.0.0 | 2026-02-20
+
+## 🧱 계층형 통합 구조 (L1/L2/L3 대응)
+
+VSH는 계층형 파이프라인에 맞게 아키텍처 호환 L1 스캐너 어댑터를 제공합니다.
+
+- `modules/scanner/base_scanner.py`: L1 스캐너 계약 인터페이스 (`scan() -> ScanResult`)
+- `modules/scanner/vsh_l1_scanner.py`: VSH L1 구현체 (Semgrep + SBOM + OSV + 환각 패키지 감지 + Reachability)
+- `pipeline/analysis_pipeline.py`: L1/L2/L3 경계를 분리한 오케스트레이션 진입점
+
+### L1 통합 절차
+
+1. `project_root`, `out_dir`, (선택) `language`를 포함한 `VSHConfig`를 구성합니다.
+2. `VSHL1Scanner(cfg)` 인스턴스를 생성합니다.
+3. `AnalysisPipeline(scanner=...)`에 스캐너를 주입합니다.
+4. `pipeline.run_l1()`을 호출합니다. (L2/L3 구성요소가 있으면 `pipeline.run()` 사용)
+
+이 구조를 통해 L1은 상태 비저장(stateless) + 탐지 전용 책임을 유지합니다.
+
+- 리포트 생성 없음
+- 파일 출력 없음
+- CLI 출력 없음
+- LLM 호출 없음
+
+L2(설명/수정 제안)와 L3(리포팅/심화 스캔)는 파이프라인의 analyzer/reporter 인터페이스로 외부 결합할 수 있습니다.
