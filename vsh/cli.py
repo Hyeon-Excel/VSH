@@ -11,11 +11,11 @@ from vsh.engines.report_engine import calc_score, make_inline_comment, write_mar
 
 console = Console()
 
-def scan(cfg: VSHConfig) -> ScanResult:
+def scan(cfg: VSHConfig, annotate: bool = False) -> ScanResult:
     l1_scanner = VSHL1Scanner(cfg)
     pipeline = AnalysisPipeline(scanner=l1_scanner)
 
-    result = pipeline.run_l1()
+    result = pipeline.run_l1(scan_only=not annotate, annotate=annotate)
     result.score = calc_score(result.findings, result.dep_vulns, result.hallucinated_packages)
     return result
 
@@ -35,6 +35,8 @@ def main():
     ap.add_argument("--out", default="vsh_out", help="Output directory")
     ap.add_argument("--lang", default=None, choices=[None,"python","javascript"], help="Force language")
     ap.add_argument("--no-syft", action="store_true", help="Disable syft SBOM")
+    ap.add_argument("--annotate", action="store_true", help="Generate annotated copies of source files")
+    ap.add_argument("--annotated-dir", default=None, help="Where to write annotated files (defaults to <out>/annotated)")
     args = ap.parse_args()
 
     project_root = Path(args.project).resolve()
@@ -48,13 +50,23 @@ def main():
         use_syft=not args.no_syft
     )
 
-    result = scan(cfg)
+    result = scan(cfg, annotate=args.annotate)
     print_summary(result)
 
     # write report
     report_path = out_dir / "VSH_REPORT.md"
     write_markdown_report(report_path, result)
     console.print(f"[green]Report written:[/green] {report_path}")
+
+    # optionally create annotated files
+    if args.annotate:
+        from vsh.engines.code_annotator import write_annotated_files
+
+        ann_dir = Path(args.annotated_dir) if args.annotated_dir else out_dir / "annotated"
+        written = write_annotated_files(result.annotated_files, ann_dir, project_root)
+        console.print(f"[cyan]Annotated files written ({len(written)}):[/cyan]")
+        for w in written:
+            console.print(f"  {w}")
 
     # demo inline comment output (pick top 1-3)
     if result.findings:
