@@ -1,5 +1,6 @@
 README.md
 pyproject.toml
+tests/test_vsh_l1_scanner.py
 vsh/__init__.py
 vsh/cli.py
 vsh.egg-info/PKG-INFO

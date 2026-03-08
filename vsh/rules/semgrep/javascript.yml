@@ -14,3 +14,124 @@ rules:
       references:
         - "KISA 시큐어코딩 가이드 - 입력데이터 검증 및 표현"
         - "OWASP Top 10 - XSS"
+
+  # 함수별 세부 경고 룰들 (L1 확장)
+  - id: VSH-JS-EVAL-001
+    message: "위험한 eval() 사용: 코드 실행으로 이어질 수 있습니다."
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern: eval($INPUT)
+    metadata:
+      severity: CRITICAL
+      cwe: "CWE-95"
+      cvss: 9.3
+      function_risk: "eval()은 임의 코드 실행 공격에 취약합니다."
+      safe_alternatives: "JSON.parse(), Function 생성자 대신 안전한 파서 사용"
+      fix: "eval() 대신 JSON.parse() 또는 안전한 대안을 사용하세요."
+      references:
+        - "OWASP Code Injection Prevention"
+
+  - id: VSH-JS-INNERHTML-001
+    message: "XSS 위험: innerHTML이 사용자 입력을 직접 삽입합니다."
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern: $ELEMENT.innerHTML = $INPUT
+    metadata:
+      severity: HIGH
+      cwe: "CWE-79"
+      cvss: 8.2
+      function_risk: "innerHTML 속성은 XSS 공격에 취약합니다."
+      safe_alternatives: "textContent, innerText, 또는 DOM API 사용"
+      fix: "element.textContent = input; 또는 element.innerText = input;로 변경하세요."
+      references:
+        - "OWASP XSS Prevention Cheat Sheet"
+
+  - id: VSH-JS-DOCUMENT-WRITE-001
+    message: "XSS 위험: document.write()가 사용자 입력을 직접 출력합니다."
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern: document.write($INPUT)
+    metadata:
+      severity: HIGH
+      cwe: "CWE-79"
+      cvss: 7.8
+      function_risk: "document.write()는 XSS 공격에 취약합니다."
+      safe_alternatives: "innerHTML, textContent, 또는 DOM 조작 메소드"
+      fix: "document.write() 대신 DOM API를 사용하세요."
+      references:
+        - "OWASP XSS Prevention Cheat Sheet"
+
+  - id: VSH-JS-SETTIMEOUT-EVAL-001
+    message: "코드 주입 위험: setTimeout에 문자열 코드가 전달됩니다."
+    languages: [javascript, typescript]
+    severity: WARNING
+    pattern: setTimeout($CODE, ...)
+    metadata:
+      severity: MEDIUM
+      cwe: "CWE-95"
+      cvss: 6.5
+      function_risk: "setTimeout에 문자열을 전달하면 코드 주입 공격에 취약합니다."
+      safe_alternatives: "함수 객체를 전달하거나, 함수명을 문자열로 전달"
+      fix: "setTimeout(function() { /* code */ }, delay); 형태로 변경하세요."
+      references:
+        - "OWASP Code Injection Prevention"
+
+  - id: VSH-JS-SETINTERVAL-EVAL-001
+    message: "코드 주입 위험: setInterval에 문자열 코드가 전달됩니다."
+    languages: [javascript, typescript]
+    severity: WARNING
+    pattern: setInterval($CODE, ...)
+    metadata:
+      severity: MEDIUM
+      cwe: "CWE-95"
+      cvss: 6.5
+      function_risk: "setInterval에 문자열을 전달하면 코드 주입 공격에 취약합니다."
+      safe_alternatives: "함수 객체를 전달하거나, 함수명을 문자열로 전달"
+      fix: "setInterval(function() { /* code */ }, delay); 형태로 변경하세요."
+      references:
+        - "OWASP Code Injection Prevention"
+
+  - id: VSH-JS-FUNCTION-CONSTRUCTOR-001
+    message: "코드 주입 위험: Function 생성자가 동적 코드를 실행합니다."
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern: new Function($CODE)
+    metadata:
+      severity: HIGH
+      cwe: "CWE-95"
+      cvss: 8.1
+      function_risk: "Function 생성자는 코드 주입 공격에 취약합니다."
+      safe_alternatives: "함수 선언, 화살표 함수, 또는 메소드 사용"
+      fix: "new Function() 대신 일반 함수 선언을 사용하세요."
+      references:
+        - "OWASP Code Injection Prevention"
+
+  - id: VSH-JS-LOCATION-HREF-001
+    message: "오픈 리다이렉트 위험: location.href에 사용자 입력이 사용됩니다."
+    languages: [javascript, typescript]
+    severity: WARNING
+    pattern: location.href = $INPUT
+    metadata:
+      severity: MEDIUM
+      cwe: "CWE-601"
+      cvss: 6.1
+      function_risk: "location.href에 신뢰할 수 없는 입력을 사용하면 오픈 리다이렉트 공격에 취약합니다."
+      safe_alternatives: "허용된 도메인 목록으로 검증"
+      fix: "리다이렉트할 URL을 화이트리스트로 검증하세요."
+      references:
+        - "OWASP Open Redirect Prevention"
+
+  - id: VSH-JS-WINDOW-OPEN-001
+    message: "팝업 악용 위험: window.open()에 사용자 입력이 사용됩니다."
+    languages: [javascript, typescript]
+    severity: WARNING
+    pattern: window.open($URL, ...)
+    metadata:
+      severity: LOW
+      cwe: "CWE-1022"
+      cvss: 4.3
+      function_risk: "window.open()에 신뢰할 수 없는 URL을 사용하면 팝업 악용에 취약할 수 있습니다."
+      safe_alternatives: "URL 검증 또는 사용자 확인 절차 추가"
+      fix: "window.open() 호출 전에 URL을 검증하세요."
+      references:
+        - "OWASP DOM Based XSS Prevention"
