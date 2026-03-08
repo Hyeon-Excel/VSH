@@ -41,3 +41,124 @@ rules:
       fix: "shell=True 사용을 피하고, 입력을 whitelist 검증하세요."
       references:
         - "OWASP Top 10 - Injection"
+
+  # 함수별 세부 경고 룰들 (L1 확장)
+  - id: VSH-PY-XXE-001
+    message: "XXE 취약점: fromstring() 함수가 외부 엔티티를 처리할 수 있습니다."
+    languages: [python]
+    severity: ERROR
+    pattern: xml.etree.ElementTree.fromstring($INPUT)
+    metadata:
+      severity: CRITICAL
+      cwe: "CWE-611"
+      cvss: 8.2
+      function_risk: "xml.etree.ElementTree.fromstring() 함수는 XXE 공격에 취약합니다."
+      safe_alternatives: "xml.etree.ElementTree.parse() 또는 defusedxml 사용을 고려하세요."
+      fix: "외부 입력을 신뢰하지 말고, parse() 메소드를 사용하거나 defusedxml 라이브러리를 사용하세요."
+      references:
+        - "OWASP XXE Prevention Cheat Sheet"
+
+  - id: VSH-PY-XXE-002
+    message: "XXE 취약점: XMLParser()가 외부 엔티티를 허용할 수 있습니다."
+    languages: [python]
+    severity: ERROR
+    pattern: xml.etree.ElementTree.XMLParser(...)
+    metadata:
+      severity: HIGH
+      cwe: "CWE-611"
+      cvss: 7.5
+      function_risk: "XMLParser의 기본 설정이 외부 엔티티 처리를 허용할 수 있습니다."
+      safe_alternatives: "resolve_entities=False로 설정하거나 defusedxml 사용"
+      fix: "XMLParser(resolve_entities=False)로 설정하세요."
+      references:
+        - "OWASP XXE Prevention Cheat Sheet"
+
+  - id: VSH-PY-DESERIALIZE-001
+    message: "안전하지 않은 역직렬화: pickle.loads()는 임의 코드 실행으로 이어질 수 있습니다."
+    languages: [python]
+    severity: ERROR
+    pattern: pickle.loads($INPUT)
+    metadata:
+      severity: CRITICAL
+      cwe: "CWE-502"
+      cvss: 9.8
+      function_risk: "pickle.loads()는 역직렬화 공격에 취약합니다."
+      safe_alternatives: "json.loads() 또는 안전한 직렬화 라이브러리 사용"
+      fix: "신뢰할 수 있는 데이터만 역직렬화하고, 가능하면 JSON으로 마이그레이션하세요."
+      references:
+        - "OWASP Deserialization Cheat Sheet"
+
+  - id: VSH-PY-SUBPROCESS-001
+    message: "위험한 subprocess 사용: shell=True는 명령어 주입 공격에 취약합니다."
+    languages: [python]
+    severity: ERROR
+    pattern: subprocess.$METHOD(..., shell=True, ...)
+    metadata:
+      severity: HIGH
+      cwe: "CWE-78"
+      cvss: 8.6
+      function_risk: "shell=True 옵션은 명령어 주입 공격에 취약합니다."
+      safe_alternatives: "shell=False로 설정하고 리스트 형태로 명령어 전달"
+      fix: "shell=False로 변경하고 명령어를 리스트로 분리하세요: ['ls', '-la']"
+      references:
+        - "OWASP Command Injection Prevention"
+
+  - id: VSH-PY-EVAL-001
+    message: "위험한 eval() 사용: 임의 코드 실행 공격에 취약합니다."
+    languages: [python]
+    severity: ERROR
+    pattern: eval($INPUT)
+    metadata:
+      severity: CRITICAL
+      cwe: "CWE-95"
+      cvss: 9.3
+      function_risk: "eval()은 임의 코드 실행 공격에 취약합니다."
+      safe_alternatives: "ast.literal_eval(), json.loads(), 또는 안전한 파서 사용"
+      fix: "eval() 대신 ast.literal_eval()을 사용하거나, 입력을 엄격하게 검증하세요."
+      references:
+        - "OWASP Code Injection Prevention"
+
+  - id: VSH-PY-EXEC-001
+    message: "위험한 exec() 사용: 코드 실행으로 이어질 수 있습니다."
+    languages: [python]
+    severity: ERROR
+    pattern: exec($INPUT)
+    metadata:
+      severity: CRITICAL
+      cwe: "CWE-95"
+      cvss: 9.3
+      function_risk: "exec()는 임의 코드 실행 공격에 취약합니다."
+      safe_alternatives: "컴파일된 코드만 실행하거나, 입력 검증 강화"
+      fix: "exec() 대신 안전한 대안을 사용하세요."
+      references:
+        - "OWASP Code Injection Prevention"
+
+  - id: VSH-PY-OS-SYSTEM-001
+    message: "위험한 os.system() 사용: 명령어 주입 공격에 취약합니다."
+    languages: [python]
+    severity: WARNING
+    pattern: os.system($INPUT)
+    metadata:
+      severity: HIGH
+      cwe: "CWE-78"
+      cvss: 7.8
+      function_risk: "os.system()은 셸을 통해 명령어를 실행하므로 주입 공격에 취약합니다."
+      safe_alternatives: "subprocess.run() with shell=False"
+      fix: "subprocess.run(['command', 'arg1', 'arg2'], shell=False)로 변경하세요."
+      references:
+        - "OWASP Command Injection Prevention"
+
+  - id: VSH-PY-INPUT-EVAL-001
+    message: "위험한 input() + eval() 조합: 코드 실행 공격에 취약합니다."
+    languages: [python]
+    severity: ERROR
+    pattern: eval(input(...))
+    metadata:
+      severity: CRITICAL
+      cwe: "CWE-95"
+      cvss: 9.8
+      function_risk: "input() 결과를 eval()로 실행하는 것은 매우 위험합니다."
+      safe_alternatives: "입력을 엄격하게 검증하거나, 특정 타입으로 제한"
+      fix: "eval()을 제거하고 안전한 입력 처리 로직으로 변경하세요."
+      references:
+        - "OWASP Input Validation Cheat Sheet"
