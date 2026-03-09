@@ -33,6 +33,8 @@ class FixSuggestion(BaseModel):
     patch_status: str | None = None
     patch_summary: str | None = None
     patch_diff: str | None = None
+    processing_trace: list[str] = Field(default_factory=list)
+    processing_summary: str | None = None
     original_code: str
     fixed_code: str
     description: str

@@ -71,6 +71,9 @@ def test_e2e_scan_vulnerable_file(pipeline):
     assert supply_chain.get("verification_summary"), "verification_summary가 비어있습니다."
     assert supply_chain["patch_status"] == "GENERATED"
     assert supply_chain.get("patch_diff"), "patch_diff가 비어있습니다."
+    assert supply_chain.get("processing_trace"), "processing_trace가 비어있습니다."
+    assert result["summary"]["findings_total"] >= 1
+    assert result["summary"]["patch_generated_total"] >= 1
 
 @requires_server
 def test_e2e_dashboard_api(pipeline):
@@ -96,6 +99,8 @@ def test_e2e_dashboard_api(pipeline):
         assert "patch_status" in log
         assert "patch_summary" in log
         assert "patch_diff" in log
+        assert "processing_trace" in log
+        assert "processing_summary" in log
         
     # 3. pending 항목 추출
     pending_logs = [l for l in data["logs"] if l["status"] == "pending"]
@@ -145,6 +150,7 @@ def test_e2e_log_history(pipeline):
         "osv_status", "osv_summary",
         "verification_summary",
         "patch_status", "patch_summary", "patch_diff",
+        "processing_trace", "processing_summary",
     ]
     
     for log in logs:

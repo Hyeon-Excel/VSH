@@ -54,6 +54,8 @@
 | `patch_status` | `str \| None` | patch preview 생성 상태 |
 | `patch_summary` | `str \| None` | patch preview 생성 요약 |
 | `patch_diff` | `str \| None` | unified diff 형식 patch preview |
+| `processing_trace` | `list[str]` | L2 처리 경로 단계 목록 |
+| `processing_summary` | `str \| None` | 처리 경로를 요약한 문자열 |
 | `original_code` | `str` | 수정 전 원본 코드 |
 | `fixed_code` | `str` | 수정 후 제안 코드 |
 | `description` | `str` | 수정 내용에 대한 설명 |

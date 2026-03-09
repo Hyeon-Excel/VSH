@@ -46,7 +46,8 @@ class AnalysisPipeline(BasePipeline):
                 "file_path": file_path,
                 "scan_results": [],
                 "fix_suggestions": [],
-                "is_clean": True
+                "is_clean": True,
+                "summary": self._build_run_summary([], []),
             }
 
         # 1. 각 Scanner 실행
@@ -131,6 +132,12 @@ class AnalysisPipeline(BasePipeline):
                             verification_map,
                         )
                         patch_context = self.patch_builder.build(matching_vuln, suggestion)
+                        processing_trace = self._build_processing_trace(
+                            evidence_context=evidence_context,
+                            verification_context=verification_context,
+                            patch_context=patch_context,
+                            analysis_failed=False,
+                        )
                         canonical_issue_id = self._build_issue_id(
                             finding_file_path,
                             matching_vuln.cwe_id,
@@ -156,6 +163,8 @@ class AnalysisPipeline(BasePipeline):
                                 "patch_status": suggestion.patch_status or patch_context.get("patch_status"),
                                 "patch_summary": suggestion.patch_summary or patch_context.get("patch_summary"),
                                 "patch_diff": suggestion.patch_diff or patch_context.get("patch_diff"),
+                                "processing_trace": suggestion.processing_trace or processing_trace,
+                                "processing_summary": suggestion.processing_summary or self._summarize_trace(processing_trace),
                             }
                         )
                         log_data = {
@@ -180,6 +189,8 @@ class AnalysisPipeline(BasePipeline):
                             "patch_status": normalized_suggestion.patch_status,
                             "patch_summary": normalized_suggestion.patch_summary,
                             "patch_diff": normalized_suggestion.patch_diff,
+                            "processing_trace": normalized_suggestion.processing_trace,
+                            "processing_summary": normalized_suggestion.processing_summary,
                             "status": "pending"
                         }
                         suggestion.issue_id = normalized_suggestion.issue_id
@@ -197,6 +208,8 @@ class AnalysisPipeline(BasePipeline):
                         suggestion.patch_status = normalized_suggestion.patch_status
                         suggestion.patch_summary = normalized_suggestion.patch_summary
                         suggestion.patch_diff = normalized_suggestion.patch_diff
+                        suggestion.processing_trace = normalized_suggestion.processing_trace
+                        suggestion.processing_summary = normalized_suggestion.processing_summary
                         self.log_repo.save(log_data)
 
         # 8. 결과 dict로 변환 (Pydantic model_dump 사용)
@@ -204,7 +217,8 @@ class AnalysisPipeline(BasePipeline):
             "file_path": file_path,
             "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
             "fix_suggestions": [f.model_dump() for f in fix_suggestions],
-            "is_clean": is_clean
+            "is_clean": is_clean,
+            "summary": self._build_run_summary(integrated_scan_result.findings, fix_suggestions),
         }
 
     @staticmethod
@@ -315,6 +329,20 @@ class AnalysisPipeline(BasePipeline):
             "patch_status": None,
             "patch_summary": None,
             "patch_diff": None,
+            "processing_trace": cls._build_processing_trace(
+                evidence_context=evidence_context,
+                verification_context=verification_context,
+                patch_context={},
+                analysis_failed=True,
+            ),
+            "processing_summary": cls._summarize_trace(
+                cls._build_processing_trace(
+                    evidence_context=evidence_context,
+                    verification_context=verification_context,
+                    patch_context={},
+                    analysis_failed=True,
+                )
+            ),
             "analysis_error": error_message,
             "status": "analysis_failed",
         }
@@ -401,3 +429,57 @@ class AnalysisPipeline(BasePipeline):
             parts.append(f"OSV[{osv_status}] {osv_summary or ''}".strip())
 
         return " | ".join(parts) if parts else None
+
+    @staticmethod
+    def _build_processing_trace(
+        evidence_context: Dict,
+        verification_context: Dict,
+        patch_context: Dict,
+        analysis_failed: bool,
+    ) -> List[str]:
+        trace = ["scan:detected"]
+
+        if evidence_context:
+            trace.append("retrieval:enriched")
+        else:
+            trace.append("retrieval:skipped")
+
+        registry_status = verification_context.get("registry_status")
+        if registry_status:
+            trace.append(f"verification:registry:{registry_status}")
+
+        osv_status = verification_context.get("osv_status")
+        if osv_status:
+            trace.append(f"verification:osv:{osv_status}")
+
+        if analysis_failed:
+            trace.append("analysis:failed")
+        else:
+            trace.append("analysis:confirmed")
+
+        patch_status = patch_context.get("patch_status")
+        if patch_status:
+            trace.append(f"patch:{patch_status}")
+        elif not analysis_failed:
+            trace.append("patch:skipped")
+
+        return trace
+
+    @staticmethod
+    def _summarize_trace(trace: List[str]) -> str | None:
+        return " -> ".join(trace) if trace else None
+
+    @staticmethod
+    def _build_run_summary(findings: List[Vulnerability], fix_suggestions: List[FixSuggestion]) -> Dict[str, int]:
+        return {
+            "findings_total": len(findings),
+            "fix_suggestions_total": len(fix_suggestions),
+            "verified_total": sum(
+                1
+                for suggestion in fix_suggestions
+                if suggestion.registry_status is not None or suggestion.osv_status is not None
+            ),
+            "patch_generated_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.patch_status == "GENERATED"
+            ),
+        }
