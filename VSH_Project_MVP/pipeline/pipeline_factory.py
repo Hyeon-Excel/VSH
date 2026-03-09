@@ -5,6 +5,7 @@ from .analysis_pipeline import AnalysisPipeline
 from modules.scanner.mock_semgrep_scanner import MockSemgrepScanner as SemgrepScanner
 from modules.scanner.sbom_scanner import SBOMScanner
 from modules.analyzer.analyzer_factory import AnalyzerFactory
+from modules.retriever.evidence_retriever import EvidenceRetriever
 from repository.knowledge_repo import MockKnowledgeRepo
 from repository.fix_repo import MockFixRepo
 from repository.log_repo import MockLogRepo
@@ -71,6 +72,7 @@ class PipelineFactory:
         pipeline = AnalysisPipeline(
             scanners=scanners,
             analyzer=analyzer,
+            evidence_retriever=EvidenceRetriever(),
             knowledge_repo=knowledge_repo,
             fix_repo=fix_repo,
             log_repo=log_repo

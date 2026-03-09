@@ -61,6 +61,8 @@ def test_e2e_scan_vulnerable_file(pipeline):
     
     for suggestion in result["fix_suggestions"]:
         assert suggestion.get("fixed_code"), "fixed_code가 비어있습니다."
+        assert suggestion.get("evidence_refs"), "evidence_refs가 비어있습니다."
+        assert suggestion.get("evidence_summary"), "evidence_summary가 비어있습니다."
 
 @requires_server
 def test_e2e_dashboard_api(pipeline):
@@ -78,6 +80,8 @@ def test_e2e_dashboard_api(pipeline):
     for log in data["logs"]:
         assert "original_code" in log
         assert "fixed_code" in log
+        assert "evidence_refs" in log
+        assert "evidence_summary" in log
         
     # 3. pending 항목 추출
     pending_logs = [l for l in data["logs"] if l["status"] == "pending"]
@@ -121,7 +125,8 @@ def test_e2e_log_history(pipeline):
     expected_fields = [
         "issue_id", "file_path", "cwe_id", 
         "severity", "line_number", "code_snippet",
-        "original_code", "fixed_code", "status"
+        "original_code", "fixed_code", "status",
+        "evidence_refs", "evidence_summary"
     ]
     
     for log in logs:

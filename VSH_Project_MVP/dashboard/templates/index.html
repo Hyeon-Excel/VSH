@@ -325,6 +325,11 @@
                     renderAnalysisItem('수정 설명', log.description),
                     renderAnalysisItem('Reachability', log.reachability),
                     renderAnalysisItem('KISA Reference', log.kisa_reference),
+                    renderAnalysisItem('Evidence Summary', log.evidence_summary),
+                    renderAnalysisItem(
+                        'Evidence Refs',
+                        Array.isArray(log.evidence_refs) ? log.evidence_refs.join('\n') : '',
+                    ),
                     renderAnalysisItem('L2 오류', log.analysis_error, true),
                 ].filter(Boolean).join('');
 

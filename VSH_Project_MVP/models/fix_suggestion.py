@@ -11,6 +11,8 @@ class FixSuggestion(BaseModel):
         line_number (int | None): 취약점 라인 번호
         reachability (str | None): 실제 위협 여부 판단 근거
         kisa_reference (str | None): 연관된 KISA 기준 또는 참조
+        evidence_refs (list[str]): 근거 참조 목록
+        evidence_summary (str | None): 근거 요약
         original_code (str): 수정 전 원본 코드
         fixed_code (str): 수정 후 제안 코드
         description (str): 수정 내용에 대한 설명
@@ -21,6 +23,8 @@ class FixSuggestion(BaseModel):
     line_number: int | None = Field(default=None, ge=1)
     reachability: str | None = None
     kisa_reference: str | None = None
+    evidence_refs: list[str] = Field(default_factory=list)
+    evidence_summary: str | None = None
     original_code: str
     fixed_code: str
     description: str

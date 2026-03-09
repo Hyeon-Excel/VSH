@@ -1,0 +1,172 @@
+import re
+from pathlib import Path
+from typing import Dict, List
+
+from models.scan_result import ScanResult
+
+try:
+    from config import VULNERABLE_PACKAGES
+except ImportError:
+    VULNERABLE_PACKAGES = {}
+
+
+class EvidenceRetriever:
+    """
+    finding별로 관련 근거와 수정 맥락을 정리하는 L2 retrieval 컴포넌트.
+    """
+
+    def retrieve(
+        self,
+        scan_result: ScanResult,
+        knowledge: List[Dict],
+        fix_hints: List[Dict],
+    ) -> Dict[str, Dict]:
+        knowledge_map = {item.get("id"): item for item in knowledge}
+        fix_map = {item.get("id"): item for item in fix_hints}
+        evidence_map: Dict[str, Dict] = {}
+
+        for finding in scan_result.findings:
+            file_path = finding.file_path or scan_result.file_path
+            issue_id = self._build_issue_id(file_path, finding.cwe_id, finding.line_number)
+            knowledge_entry = knowledge_map.get(finding.cwe_id, {})
+            fix_entry = fix_map.get(finding.cwe_id, {})
+
+            evidence_map[issue_id] = {
+                "issue_id": issue_id,
+                "file_path": file_path,
+                "cwe_id": finding.cwe_id,
+                "line_number": finding.line_number,
+                "knowledge_description": knowledge_entry.get("description"),
+                "remediation_summary": self._build_remediation_summary(
+                    finding.cwe_id,
+                    fix_entry,
+                    knowledge_entry,
+                    finding.code_snippet,
+                ),
+                "evidence_summary": self._build_evidence_summary(
+                    file_path,
+                    finding.cwe_id,
+                    finding.code_snippet,
+                    knowledge_entry,
+                ),
+                "evidence_refs": self._build_evidence_refs(
+                    finding.cwe_id,
+                    knowledge_entry,
+                    finding.code_snippet,
+                ),
+                "primary_reference": self._build_primary_reference(
+                    finding.cwe_id,
+                    knowledge_entry,
+                    finding.code_snippet,
+                ),
+                "recommended_fix": (
+                    fix_entry.get("safe")
+                    or fix_entry.get("fixed_code")
+                    or self._build_dependency_fix(finding.code_snippet)
+                ),
+            }
+
+        return evidence_map
+
+    def _build_remediation_summary(
+        self,
+        cwe_id: str,
+        fix_entry: Dict,
+        knowledge_entry: Dict,
+        code_snippet: str,
+    ) -> str:
+        if cwe_id == "CWE-829":
+            dependency_fix = self._build_dependency_fix(code_snippet)
+            if dependency_fix:
+                return f"취약 버전 의존성을 `{dependency_fix}` 기준으로 상향합니다."
+            return "취약 의존성을 안전한 버전 범위로 상향합니다."
+
+        return (
+            fix_entry.get("description")
+            or knowledge_entry.get("description")
+            or "관련 보안 규칙에 맞춰 안전한 구현으로 변경합니다."
+        )
+
+    def _build_evidence_summary(
+        self,
+        file_path: str,
+        cwe_id: str,
+        code_snippet: str,
+        knowledge_entry: Dict,
+    ) -> str:
+        file_name = Path(file_path).name
+        if cwe_id == "CWE-829":
+            package_name, package_version = self._parse_requirement(code_snippet)
+            vuln_info = VULNERABLE_PACKAGES.get(package_name or "", {})
+            safe_floor = vuln_info.get("vulnerable_below")
+            if package_name and package_version and safe_floor:
+                return (
+                    f"{file_name}에 선언된 `{package_name}=={package_version}`가 "
+                    f"안전 기준 `{safe_floor}` 미만으로 탐지되었습니다."
+                )
+            return f"{file_name}에 취약 의존성 선언이 탐지되었습니다."
+
+        description = knowledge_entry.get("description")
+        if description:
+            return f"{file_name}에서 `{cwe_id}` 패턴과 일치하는 코드가 발견되었습니다. {description}."
+        return f"{file_name}에서 `{cwe_id}`와 관련된 위험 코드가 탐지되었습니다."
+
+    def _build_evidence_refs(
+        self,
+        cwe_id: str,
+        knowledge_entry: Dict,
+        code_snippet: str,
+    ) -> List[str]:
+        refs: List[str] = []
+        refs.append(cwe_id)
+
+        if knowledge_entry.get("reference"):
+            refs.append(knowledge_entry["reference"])
+
+        if cwe_id == "CWE-829":
+            package_name, _ = self._parse_requirement(code_snippet)
+            vuln_info = VULNERABLE_PACKAGES.get(package_name or "", {})
+            if package_name:
+                refs.append(f"Package: {package_name}")
+            if vuln_info.get("vulnerable_below"):
+                refs.append(f"Safe floor: {vuln_info['vulnerable_below']}")
+            if vuln_info.get("cve"):
+                refs.append(vuln_info["cve"])
+
+        return refs
+
+    def _build_primary_reference(
+        self,
+        cwe_id: str,
+        knowledge_entry: Dict,
+        code_snippet: str,
+    ) -> str | None:
+        if knowledge_entry.get("reference"):
+            return knowledge_entry["reference"]
+
+        if cwe_id == "CWE-829":
+            package_name, _ = self._parse_requirement(code_snippet)
+            vuln_info = VULNERABLE_PACKAGES.get(package_name or "", {})
+            if vuln_info.get("cve"):
+                return vuln_info["cve"]
+
+        return None
+
+    def _build_dependency_fix(self, requirement_line: str) -> str | None:
+        package_name, _ = self._parse_requirement(requirement_line)
+        vuln_info = VULNERABLE_PACKAGES.get(package_name or "", {})
+        safe_floor = vuln_info.get("vulnerable_below")
+        if package_name and safe_floor:
+            return f"{package_name}>={safe_floor}"
+        return None
+
+    @staticmethod
+    def _parse_requirement(requirement_line: str) -> tuple[str | None, str | None]:
+        match = re.match(r"^([a-zA-Z0-9_\\-]+)(?:[=!<>~]+([0-9\\.]+))?", requirement_line.strip())
+        if not match:
+            return None, None
+        return match.group(1).lower(), match.group(2)
+
+    @staticmethod
+    def _build_issue_id(file_path: str, cwe_id: str, line_number: int) -> str:
+        return f"{file_path}_{cwe_id}_{line_number}"
