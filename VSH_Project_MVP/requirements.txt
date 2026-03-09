@@ -2,6 +2,7 @@
 requests==2.9.0
 
 anthropic
+chromadb
 fastapi
 fastmcp
 google-generativeai
