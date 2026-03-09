@@ -7,6 +7,8 @@ from repository.knowledge_repo import MockKnowledgeRepo
 
 class FakeChromaRetriever:
     ready = True
+    status = "READY"
+    status_summary = "Chroma collection `vsh_kisa_guide` 연결이 활성화되었습니다."
 
     def query(self, cwe_id: str, code_snippet: str = "", n_results: int = 4):
         return [
@@ -25,6 +27,15 @@ class FakeChromaRetriever:
                 "cvss_score": "",
             },
         ]
+
+
+class DisabledChromaRetriever:
+    ready = False
+    status = "MISSING_DEPENDENCY"
+    status_summary = "chromadb 패키지가 설치되지 않아 Chroma RAG가 비활성화되었습니다."
+
+    def query(self, cwe_id: str, code_snippet: str = "", n_results: int = 4):
+        return []
 
 
 def test_evidence_retriever_builds_code_finding_context():
@@ -105,7 +116,39 @@ def test_evidence_retriever_includes_chroma_context_when_available():
     )
 
     context = evidence_map["tests/e2e_target.py_CWE-89_5"]
+    assert context["retrieval_backend"] == "chroma_only"
+    assert context["chroma_status"] == "READY"
+    assert context["chroma_hits"] == 2
     assert context["primary_reference"] == "KISA: KISA 시큐어코딩 DB-RAG-01"
     assert "KISA: KISA 시큐어코딩 DB-RAG-01" in context["evidence_refs"]
     assert "OWASP: A03:2021" in context["evidence_refs"]
     assert "DB-RAG-01" in (context["evidence_summary"] or "")
+
+
+def test_evidence_retriever_reports_chroma_runtime_status_when_disabled():
+    retriever = EvidenceRetriever(chroma_retriever=DisabledChromaRetriever())
+    scan_result = ScanResult(
+        file_path="tests/e2e_target.py",
+        language="python",
+        findings=[
+            Vulnerability(
+                file_path="tests/e2e_target.py",
+                cwe_id="CWE-89",
+                severity="HIGH",
+                line_number=5,
+                code_snippet="cursor.execute('SELECT * FROM users WHERE id = %s' % user_input)",
+            )
+        ],
+    )
+
+    evidence_map = retriever.retrieve(
+        scan_result,
+        knowledge=[],
+        fix_hints=[],
+    )
+
+    context = evidence_map["tests/e2e_target.py_CWE-89_5"]
+    assert context["retrieval_backend"] == "empty"
+    assert context["chroma_status"] == "MISSING_DEPENDENCY"
+    assert "비활성화" in (context["chroma_summary"] or "")
+    assert context["chroma_hits"] == 0

@@ -326,6 +326,10 @@
                     renderAnalysisItem('Reachability', log.reachability),
                     renderAnalysisItem('KISA Reference', log.kisa_reference),
                     renderAnalysisItem('Evidence Summary', log.evidence_summary),
+                    renderAnalysisItem('Retrieval Backend', log.retrieval_backend),
+                    renderAnalysisItem('Chroma Status', log.chroma_status),
+                    renderAnalysisItem('Chroma Summary', log.chroma_summary),
+                    renderAnalysisItem('Chroma Hits', log.chroma_hits),
                     renderAnalysisItem(
                         'Evidence Refs',
                         Array.isArray(log.evidence_refs) ? log.evidence_refs.join('\n') : '',

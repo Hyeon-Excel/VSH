@@ -19,6 +19,20 @@ class EvidenceRetriever:
     def __init__(self, chroma_retriever: Optional[ChromaRetriever] = None):
         self.chroma_retriever = chroma_retriever or ChromaRetriever()
 
+    def runtime_status(self) -> Dict[str, str]:
+        status = getattr(self.chroma_retriever, "status", None)
+        summary = getattr(self.chroma_retriever, "status_summary", None)
+
+        if status is None:
+            status = "READY" if getattr(self.chroma_retriever, "ready", False) else "DISABLED"
+        if summary is None:
+            summary = "Chroma RAG 활성화 상태를 확인하지 못했습니다."
+
+        return {
+            "status": status,
+            "summary": summary,
+        }
+
     def retrieve(
         self,
         scan_result: ScanResult,
@@ -28,6 +42,7 @@ class EvidenceRetriever:
         knowledge_map = {item.get("id"): item for item in knowledge}
         fix_map = {item.get("id"): item for item in fix_hints}
         evidence_map: Dict[str, Dict] = {}
+        chroma_runtime = self.runtime_status()
 
         for finding in scan_result.findings:
             file_path = finding.file_path or scan_result.file_path
@@ -35,12 +50,21 @@ class EvidenceRetriever:
             knowledge_entry = knowledge_map.get(finding.cwe_id, {})
             fix_entry = fix_map.get(finding.cwe_id, {})
             chroma_docs = self._query_chroma(finding.cwe_id, finding.code_snippet)
+            retrieval_backend = self._build_retrieval_backend(
+                chroma_docs=chroma_docs,
+                knowledge_entry=knowledge_entry,
+                fix_entry=fix_entry,
+            )
 
             evidence_map[issue_id] = {
                 "issue_id": issue_id,
                 "file_path": file_path,
                 "cwe_id": finding.cwe_id,
                 "line_number": finding.line_number,
+                "retrieval_backend": retrieval_backend,
+                "chroma_status": chroma_runtime["status"],
+                "chroma_summary": chroma_runtime["summary"],
+                "chroma_hits": len(chroma_docs),
                 "knowledge_description": self._build_knowledge_description(
                     knowledge_entry,
                     chroma_docs,
@@ -197,6 +221,23 @@ class EvidenceRetriever:
         if package_name and safe_floor:
             return f"{package_name}>={safe_floor}"
         return None
+
+    @staticmethod
+    def _build_retrieval_backend(
+        chroma_docs: List[Dict],
+        knowledge_entry: Dict,
+        fix_entry: Dict,
+    ) -> str:
+        has_static_context = bool(knowledge_entry or fix_entry)
+        has_chroma_context = bool(chroma_docs)
+
+        if has_static_context and has_chroma_context:
+            return "hybrid"
+        if has_chroma_context:
+            return "chroma_only"
+        if has_static_context:
+            return "static_only"
+        return "empty"
 
     @staticmethod
     def _build_chroma_summary(chroma_docs: List[Dict]) -> str | None:

@@ -1,4 +1,5 @@
 import importlib
+from pathlib import Path
 
 from models.fix_suggestion import FixSuggestion
 from models.scan_result import ScanResult
@@ -51,6 +52,48 @@ class DummyWriteRepo(DummyReadRepo):
         return False
 
 
+class DummyEvidenceRetriever:
+    def __init__(
+        self,
+        retrieval_backend: str = "static_only",
+        chroma_status: str = "MISSING_DEPENDENCY",
+        chroma_summary: str = "chromadb 패키지가 설치되지 않아 Chroma RAG가 비활성화되었습니다.",
+        chroma_hits: int = 0,
+    ):
+        self._retrieval_backend = retrieval_backend
+        self._chroma_status = chroma_status
+        self._chroma_summary = chroma_summary
+        self._chroma_hits = chroma_hits
+
+    def runtime_status(self):
+        return {
+            "status": self._chroma_status,
+            "summary": self._chroma_summary,
+        }
+
+    def retrieve(self, scan_result, knowledge, fix_hints):
+        evidence_map = {}
+        for finding in scan_result.findings:
+            issue_id = f"{finding.file_path}_{finding.cwe_id}_{finding.line_number}"
+            evidence_map[issue_id] = {
+                "issue_id": issue_id,
+                "file_path": finding.file_path,
+                "cwe_id": finding.cwe_id,
+                "line_number": finding.line_number,
+                "knowledge_description": "테스트용 근거 설명",
+                "remediation_summary": "테스트용 수정 요약",
+                "evidence_summary": f"{Path(finding.file_path).name}에서 테스트용 근거가 생성되었습니다.",
+                "evidence_refs": [finding.cwe_id, "KISA 시큐어코딩 DB-01"],
+                "primary_reference": "KISA 시큐어코딩 DB-01",
+                "recommended_fix": None,
+                "retrieval_backend": self._retrieval_backend,
+                "chroma_status": self._chroma_status,
+                "chroma_summary": self._chroma_summary,
+                "chroma_hits": self._chroma_hits,
+            }
+        return evidence_map
+
+
 def test_fix_suggestion_preserves_l2_metadata():
     suggestion = FixSuggestion(
         issue_id="issue-1",
@@ -73,6 +116,10 @@ def test_fix_suggestion_preserves_l2_metadata():
     assert payload["kisa_reference"] == "KISA DB-01"
     assert payload["evidence_refs"] == []
     assert payload["evidence_summary"] is None
+    assert payload["retrieval_backend"] is None
+    assert payload["chroma_status"] is None
+    assert payload["chroma_summary"] is None
+    assert payload["chroma_hits"] == 0
     assert payload["registry_status"] is None
     assert payload["registry_summary"] is None
     assert payload["osv_status"] is None
@@ -122,6 +169,7 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     pipeline = AnalysisPipeline(
         scanners=[DummyScanner(finding)],
         analyzer=DummyAnalyzer(suggestion),
+        evidence_retriever=DummyEvidenceRetriever(),
         knowledge_repo=DummyReadRepo(),
         fix_repo=DummyReadRepo(),
         log_repo=log_repo,
@@ -137,6 +185,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["fix_suggestions"][0]["kisa_reference"] == "KISA DB-01"
     assert result["fix_suggestions"][0]["evidence_refs"] == ["CWE-89", "KISA 시큐어코딩 DB-01"]
     assert result["fix_suggestions"][0]["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
+    assert result["fix_suggestions"][0]["retrieval_backend"] == "static_only"
+    assert result["fix_suggestions"][0]["chroma_status"] == "MISSING_DEPENDENCY"
+    assert result["fix_suggestions"][0]["chroma_hits"] == 0
     assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
     assert result["fix_suggestions"][0]["patch_summary"]
     assert "-cursor.execute(query % user_input)" in (result["fix_suggestions"][0]["patch_diff"] or "")
@@ -147,6 +198,8 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["fix_suggestions"][0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
+        "retrieval:backend:static_only",
+        "retrieval:chroma:MISSING_DEPENDENCY",
         "analysis:confirmed",
         "patch:GENERATED",
     ]
@@ -159,6 +212,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert log_repo.saved[0]["kisa_reference"] == "KISA DB-01"
     assert log_repo.saved[0]["evidence_refs"] == ["CWE-89", "KISA 시큐어코딩 DB-01"]
     assert log_repo.saved[0]["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
+    assert log_repo.saved[0]["retrieval_backend"] == "static_only"
+    assert log_repo.saved[0]["chroma_status"] == "MISSING_DEPENDENCY"
+    assert log_repo.saved[0]["chroma_hits"] == 0
     assert log_repo.saved[0]["registry_status"] is None
     assert log_repo.saved[0]["osv_status"] is None
     assert log_repo.saved[0]["patch_status"] == "GENERATED"
@@ -170,12 +226,17 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert log_repo.saved[0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
+        "retrieval:backend:static_only",
+        "retrieval:chroma:MISSING_DEPENDENCY",
         "analysis:confirmed",
         "patch:GENERATED",
     ]
     assert log_repo.saved[0]["processing_summary"]
     assert result["summary"]["findings_total"] == 1
     assert result["summary"]["patch_generated_total"] == 1
+    assert result["summary"]["chroma_status"] == "MISSING_DEPENDENCY"
+    assert result["summary"]["retrieval_static_only_total"] == 1
+    assert result["summary"]["chroma_enriched_total"] == 0
 
 
 def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
@@ -206,6 +267,7 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     pipeline = AnalysisPipeline(
         scanners=[DummyScanner(finding)],
         analyzer=DummyAnalyzer(suggestion),
+        evidence_retriever=DummyEvidenceRetriever(),
         knowledge_repo=DummyReadRepo(),
         fix_repo=DummyReadRepo(),
         log_repo=log_repo,
@@ -227,6 +289,8 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     assert result["fix_suggestions"][0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
+        "retrieval:backend:static_only",
+        "retrieval:chroma:MISSING_DEPENDENCY",
         "verification:registry:FOUND",
         "verification:osv:FOUND",
         "analysis:confirmed",
@@ -259,6 +323,7 @@ def test_pipeline_logs_analysis_failures(tmp_path):
     pipeline = AnalysisPipeline(
         scanners=[DummyScanner(finding)],
         analyzer=FailingAnalyzer("Gemini SDK unavailable"),
+        evidence_retriever=DummyEvidenceRetriever(),
         knowledge_repo=DummyReadRepo(),
         fix_repo=DummyReadRepo(),
         log_repo=log_repo,
@@ -282,6 +347,8 @@ def test_pipeline_logs_analysis_failures(tmp_path):
     assert log_repo.saved[0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
+        "retrieval:backend:static_only",
+        "retrieval:chroma:MISSING_DEPENDENCY",
         "analysis:failed",
     ]
     assert log_repo.saved[0]["processing_summary"]
@@ -308,3 +375,17 @@ def test_deduplicate_keeps_findings_from_different_files():
     deduplicated = AnalysisPipeline._deduplicate(findings)
 
     assert len(deduplicated) == 2
+
+
+def test_log_repo_uses_absolute_default_path_and_creates_parent_dir(tmp_path, monkeypatch):
+    config_module = importlib.import_module("config")
+    log_repo_module = importlib.import_module("repository.log_repo")
+
+    assert Path(config_module.LOG_PATH).is_absolute()
+
+    nested_log_path = tmp_path / "nested" / "logs" / "log.json"
+    monkeypatch.setattr(log_repo_module, "LOG_PATH", str(nested_log_path))
+    repo = log_repo_module.MockLogRepo()
+
+    assert repo.save({"issue_id": "issue-1", "status": "pending"}) is True
+    assert nested_log_path.exists()

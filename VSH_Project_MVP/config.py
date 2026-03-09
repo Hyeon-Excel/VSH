@@ -1,17 +1,17 @@
-import os
 from pathlib import Path
 
+# Project Root
+PROJECT_ROOT = Path(__file__).resolve().parent
+
 # Base directory for Mock DB
-MOCK_DB_DIR = os.path.join(os.path.dirname(__file__), "mock_db")
-CHROMA_DB_DIR = os.path.join(os.path.dirname(__file__), ".chroma_db")
+MOCK_DB_DIR = PROJECT_ROOT / "mock_db"
+CHROMA_DB_DIR = PROJECT_ROOT / ".chroma_db"
 CHROMA_COLLECTION = "vsh_kisa_guide"
 
 # Paths for read-only repositories
-KNOWLEDGE_PATH = os.path.join(MOCK_DB_DIR, "knowledge.json")
-FIX_PATH = os.path.join(MOCK_DB_DIR, "kisa_fix.json")
-
-# Project Root
-PROJECT_ROOT = Path(__file__).parent
+KNOWLEDGE_PATH = str(MOCK_DB_DIR / "knowledge.json")
+FIX_PATH = str(MOCK_DB_DIR / "kisa_fix.json")
+LOG_PATH = str(MOCK_DB_DIR / "log.json")
 
 # Vulnerable Packages for SBOM Scanner
 VULNERABLE_PACKAGES = {

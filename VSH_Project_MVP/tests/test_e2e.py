@@ -3,6 +3,7 @@ import json
 import pytest
 import requests
 from dotenv import load_dotenv
+from config import LOG_PATH as DEFAULT_LOG_PATH
 from pipeline import PipelineFactory
 
 load_dotenv()
@@ -22,7 +23,7 @@ requires_server = pytest.mark.skipif(
 )
 
 # log.json 경로 가져오기
-LOG_PATH = os.getenv("LOG_PATH", "mock_db/log.json")
+LOG_PATH = os.getenv("LOG_PATH", DEFAULT_LOG_PATH)
 
 def _clear_log_json():
     """log.json을 빈 리스트로 초기화합니다."""
@@ -63,6 +64,8 @@ def test_e2e_scan_vulnerable_file(pipeline):
         assert suggestion.get("fixed_code"), "fixed_code가 비어있습니다."
         assert suggestion.get("evidence_refs"), "evidence_refs가 비어있습니다."
         assert suggestion.get("evidence_summary"), "evidence_summary가 비어있습니다."
+        assert suggestion.get("retrieval_backend"), "retrieval_backend가 비어있습니다."
+        assert suggestion.get("chroma_status"), "chroma_status가 비어있습니다."
 
     supply_chain = next((s for s in result["fix_suggestions"] if s["cwe_id"] == "CWE-829"), None)
     assert supply_chain is not None, "CWE-829 공급망 finding이 누락되었습니다."
@@ -97,6 +100,10 @@ def test_e2e_dashboard_api(pipeline):
         assert "fixed_code" in log
         assert "evidence_refs" in log
         assert "evidence_summary" in log
+        assert "retrieval_backend" in log
+        assert "chroma_status" in log
+        assert "chroma_summary" in log
+        assert "chroma_hits" in log
         assert "registry_status" in log
         assert "osv_status" in log
         assert "verification_summary" in log
@@ -153,6 +160,7 @@ def test_e2e_log_history(pipeline):
         "severity", "line_number", "code_snippet",
         "original_code", "fixed_code", "status",
         "evidence_refs", "evidence_summary",
+        "retrieval_backend", "chroma_status", "chroma_summary", "chroma_hits",
         "registry_status", "registry_summary",
         "osv_status", "osv_summary",
         "verification_summary",
