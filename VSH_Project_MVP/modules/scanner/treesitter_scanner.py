@@ -52,6 +52,7 @@ class TreeSitterScanner(BaseScanner):
                     pattern = knowledge.get("pattern")
                     if pattern and re.search(pattern, snippet):
                         v = Vulnerability(
+                            file_path=file_path,
                             cwe_id=knowledge.get("id", "UNKNOWN"),
                             severity=knowledge.get("severity", "MEDIUM"),
                             line_number=line_number,

@@ -51,5 +51,7 @@ class BaseAnalyzer(ABC):
 
         Returns:
             List[FixSuggestion]: 확정된 취약점에 대한 수정 제안 목록
+            issue_id 외에도 cwe_id, line_number, reachability, kisa_reference
+            같은 L2 메타데이터를 보존할 수 있습니다.
         """
         pass

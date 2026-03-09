@@ -1,0 +1,120 @@
+import re
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+from ..base_module import BaseAnalyzer
+from models.fix_suggestion import FixSuggestion
+from models.scan_result import ScanResult
+
+try:
+    from config import VULNERABLE_PACKAGES
+except ImportError:
+    VULNERABLE_PACKAGES = {}
+
+
+class MockAnalyzer(BaseAnalyzer):
+    """
+    외부 LLM 없이도 deterministic한 수정 제안을 생성하는 테스트용 Analyzer.
+    """
+
+    def __init__(self, api_key: str = ""):
+        self.api_key = api_key
+        self.last_error: str | None = None
+
+    def analyze(
+        self,
+        scan_result: ScanResult,
+        knowledge: List[Dict],
+        fix_hints: List[Dict],
+    ) -> List[FixSuggestion]:
+        self.last_error = None
+        if not scan_result.findings:
+            return []
+
+        knowledge_map = {item.get("id"): item for item in knowledge}
+        fix_map = {item.get("id"): item for item in fix_hints}
+        suggestions: List[FixSuggestion] = []
+
+        for finding in scan_result.findings:
+            file_path = finding.file_path or scan_result.file_path
+            fix_hint = fix_map.get(finding.cwe_id, {})
+            knowledge_entry = knowledge_map.get(finding.cwe_id, {})
+            fixed_code, description, reference = self._resolve_fix(
+                finding.cwe_id,
+                finding.code_snippet,
+                fix_hint,
+                knowledge_entry,
+            )
+
+            suggestions.append(
+                FixSuggestion(
+                    issue_id=self._build_issue_id(file_path, finding.cwe_id, finding.line_number),
+                    file_path=file_path,
+                    cwe_id=finding.cwe_id,
+                    line_number=finding.line_number,
+                    reachability=self._build_reachability(finding.cwe_id, file_path),
+                    kisa_reference=reference or knowledge_entry.get("reference"),
+                    original_code=finding.code_snippet,
+                    fixed_code=fixed_code,
+                    description=description,
+                )
+            )
+
+        return suggestions
+
+    def _resolve_fix(
+        self,
+        cwe_id: str,
+        code_snippet: str,
+        fix_hint: Dict,
+        knowledge_entry: Dict,
+    ) -> Tuple[str, str, str | None]:
+        if cwe_id == "CWE-829":
+            package_name, safe_requirement, reference = self._build_dependency_fix(code_snippet)
+            description = (
+                f"{package_name} 의존성 버전을 안전 기준 이상으로 상향합니다."
+                if package_name
+                else "취약한 의존성을 안전한 버전 범위로 상향합니다."
+            )
+            return safe_requirement, description, reference
+
+        fixed_code = fix_hint.get("safe") or fix_hint.get("fixed_code") or code_snippet
+        description = (
+            fix_hint.get("description")
+            or knowledge_entry.get("description")
+            or "정적 규칙 기반 analyzer가 수정 방향을 제안했습니다."
+        )
+        reference = knowledge_entry.get("reference")
+        return fixed_code, description, reference
+
+    def _build_dependency_fix(self, requirement_line: str) -> Tuple[str, str, str | None]:
+        match = re.match(r"^([a-zA-Z0-9_\\-]+)(?:[=!<>~]+([0-9\\.]+))?", requirement_line.strip())
+        if not match:
+            return "", requirement_line, "Dependency policy"
+
+        package_name = match.group(1).lower()
+        vuln_info = VULNERABLE_PACKAGES.get(package_name, {})
+        safe_version = vuln_info.get("vulnerable_below")
+        if safe_version:
+            fixed_requirement = f"{package_name}>={safe_version}"
+        else:
+            fixed_requirement = f"{package_name}>=latest"
+
+        reference_parts = ["Dependency policy"]
+        if safe_version:
+            reference_parts.append(f"safe floor {safe_version}")
+        if vuln_info.get("cve"):
+            reference_parts.append(vuln_info["cve"])
+
+        return package_name, fixed_requirement, " | ".join(reference_parts)
+
+    @staticmethod
+    def _build_reachability(cwe_id: str, file_path: str) -> str:
+        file_name = Path(file_path).name
+        if cwe_id == "CWE-829":
+            return f"{file_name}에 취약 버전 의존성이 직접 선언되어 있어 즉시 수정 대상입니다."
+        return f"{file_name}에서 탐지 규칙과 일치하는 위험 코드가 직접 발견되었습니다."
+
+    @staticmethod
+    def _build_issue_id(file_path: str, cwe_id: str, line_number: int) -> str:
+        return f"{file_path}_{cwe_id}_{line_number}"

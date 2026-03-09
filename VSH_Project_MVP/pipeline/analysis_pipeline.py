@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Any
+from typing import List, Optional
 from .base_pipeline import BasePipeline
 from modules.base_module import BaseScanner, BaseAnalyzer
 from repository.base_repository import BaseReadRepository, BaseWriteRepository
@@ -76,29 +76,60 @@ class AnalysisPipeline(BasePipeline):
                 knowledge_data,
                 fix_data
             )
+            analysis_error = getattr(self.analyzer, "last_error", None)
 
             # 7. LogRepo 저장
-            for suggestion in fix_suggestions:
-                # 매칭되는 원본 vulnerability 찾기 (line_number, cwe_id)
-                # issue_id 형식: {file_path}_{cwe_id}_{line_number}
-                parts = suggestion.issue_id.split("_")
-                
-                # issue_id 파싱이 정확하지 않을 수 있으니 find로 매칭 (안전한 접근)
-                matching_vuln = next((v for v in unique_findings if f"{file_path}_{v.cwe_id}_{v.line_number}" == suggestion.issue_id), None)
-                
-                if matching_vuln:
-                    log_data = {
-                        "issue_id": suggestion.issue_id,
-                        "file_path": file_path,
-                        "cwe_id": matching_vuln.cwe_id,
-                        "severity": matching_vuln.severity,
-                        "line_number": matching_vuln.line_number,
-                        "code_snippet": matching_vuln.code_snippet,
-                        "original_code": suggestion.original_code,
-                        "fixed_code": suggestion.fixed_code,
-                        "status": "pending"
-                    }
-                    self.log_repo.save(log_data)
+            if analysis_error:
+                for finding in unique_findings:
+                    self.log_repo.save(
+                        self._build_analysis_failure_log(
+                            default_file_path=file_path,
+                            finding=finding,
+                            error_message=analysis_error,
+                        )
+                    )
+            else:
+                for suggestion in fix_suggestions:
+                    matching_vuln = self._find_matching_vulnerability(
+                        file_path=file_path,
+                        findings=unique_findings,
+                        suggestion=suggestion,
+                    )
+                    
+                    if matching_vuln:
+                        finding_file_path = self._resolve_finding_file_path(matching_vuln, file_path)
+                        canonical_issue_id = self._build_issue_id(
+                            finding_file_path,
+                            matching_vuln.cwe_id,
+                            matching_vuln.line_number,
+                        )
+                        normalized_suggestion = suggestion.model_copy(
+                            update={
+                                "issue_id": canonical_issue_id,
+                                "file_path": finding_file_path,
+                                "cwe_id": matching_vuln.cwe_id,
+                                "line_number": matching_vuln.line_number,
+                            }
+                        )
+                        log_data = {
+                            "issue_id": normalized_suggestion.issue_id,
+                            "file_path": finding_file_path,
+                            "cwe_id": matching_vuln.cwe_id,
+                            "severity": matching_vuln.severity,
+                            "line_number": matching_vuln.line_number,
+                            "code_snippet": matching_vuln.code_snippet,
+                            "original_code": normalized_suggestion.original_code or matching_vuln.code_snippet,
+                            "fixed_code": normalized_suggestion.fixed_code,
+                            "description": normalized_suggestion.description,
+                            "reachability": normalized_suggestion.reachability,
+                            "kisa_reference": normalized_suggestion.kisa_reference,
+                            "status": "pending"
+                        }
+                        suggestion.issue_id = normalized_suggestion.issue_id
+                        suggestion.file_path = normalized_suggestion.file_path
+                        suggestion.cwe_id = normalized_suggestion.cwe_id
+                        suggestion.line_number = normalized_suggestion.line_number
+                        self.log_repo.save(log_data)
 
         # 8. 결과 dict로 변환 (Pydantic model_dump 사용)
         return {
@@ -121,8 +152,89 @@ class AnalysisPipeline(BasePipeline):
         """
         unique_map = {}
         for f in findings:
-            key = f"{f.cwe_id}_{f.line_number}"
+            key = f"{f.file_path or ''}_{f.cwe_id}_{f.line_number}"
             if key not in unique_map:
                 unique_map[key] = f
         
         return list(unique_map.values())
+
+    @staticmethod
+    def _find_matching_vulnerability(
+        file_path: str,
+        findings: List[Vulnerability],
+        suggestion: FixSuggestion,
+    ) -> Optional[Vulnerability]:
+        """
+        FixSuggestion의 구조화된 메타데이터를 우선 사용하여 원본 취약점을 찾습니다.
+        메타데이터가 없으면 기존 issue_id 기반 매칭으로 fallback 합니다.
+        """
+        if suggestion.cwe_id and suggestion.line_number is not None:
+            suggestion_file_path = suggestion.file_path or file_path
+            match = next(
+                (
+                    finding
+                    for finding in findings
+                    if finding.cwe_id == suggestion.cwe_id
+                    and finding.line_number == suggestion.line_number
+                    and AnalysisPipeline._resolve_finding_file_path(finding, file_path) == suggestion_file_path
+                ),
+                None,
+            )
+            if match:
+                return match
+
+            if suggestion.file_path is None:
+                return next(
+                    (
+                        finding
+                        for finding in findings
+                        if finding.cwe_id == suggestion.cwe_id and finding.line_number == suggestion.line_number
+                    ),
+                    None,
+                )
+
+        return next(
+            (
+                finding
+                for finding in findings
+                if AnalysisPipeline._build_issue_id(
+                    AnalysisPipeline._resolve_finding_file_path(finding, file_path),
+                    finding.cwe_id,
+                    finding.line_number,
+                ) == suggestion.issue_id
+                or f"{file_path}_{finding.cwe_id}_{finding.line_number}" == suggestion.issue_id
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _resolve_finding_file_path(finding: Vulnerability, default_file_path: str) -> str:
+        return finding.file_path or default_file_path
+
+    @staticmethod
+    def _build_issue_id(file_path: str, cwe_id: str, line_number: int) -> str:
+        return f"{file_path}_{cwe_id}_{line_number}"
+
+    @classmethod
+    def _build_analysis_failure_log(
+        cls,
+        default_file_path: str,
+        finding: Vulnerability,
+        error_message: str,
+    ) -> dict:
+        finding_file_path = cls._resolve_finding_file_path(finding, default_file_path)
+        return {
+            "issue_id": cls._build_issue_id(finding_file_path, finding.cwe_id, finding.line_number),
+            "file_path": finding_file_path,
+            "cwe_id": finding.cwe_id,
+            "severity": finding.severity,
+            "line_number": finding.line_number,
+            "code_snippet": finding.code_snippet,
+            "original_code": finding.code_snippet,
+            "fixed_code": "",
+            "description": "L2 분석 실패로 수정 제안을 생성하지 못했습니다.",
+            "reachability": None,
+            "kisa_reference": None,
+            "analysis_error": error_message,
+            "status": "analysis_failed",
+        }

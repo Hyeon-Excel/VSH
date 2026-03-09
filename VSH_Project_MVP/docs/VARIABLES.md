@@ -30,12 +30,17 @@
 - `code_snippet`: L1에서 탐지된 의심 코드 한 줄
 - `original_code`: L2 분석 시 사용된 원본 전체 컨텍스트 (수정 전)
 - `fixed_code`: AI가 제안한 안전한 코드 (수정 후)
-- `status`: 현재 처리 상태 (`pending`, `accepted`, `dismissed`)
+- `status`: 현재 처리 상태 (`pending`, `accepted`, `dismissed`, `analysis_failed`)
+- `description`: L2가 생성한 수정 설명
+- `reachability`: L2가 판단한 실제 위협 도달 가능성 설명
+- `kisa_reference`: 연관된 KISA 또는 보안 기준 참조
+- `analysis_error`: L2 분석 실패 시 저장되는 오류 메시지
 
 ### Status Allowed Values
 - **pending**: 분석 직후의 기본 상태
 - **accepted**: 사용자가 수정을 승인하고 코드를 복사한 상태
 - **dismissed**: 사용자가 오탐으로 판단하여 무시한 상태
+- **analysis_failed**: L2 분석이 실패하여 수정 제안을 생성하지 못한 상태
 
 ---
 
@@ -51,5 +56,5 @@
 
 ### Environment Variables (.env)
 - `LOG_PATH`: 분석 결과 로그 파일 경로 (`mock_db/log.json`)
-- `LLM_PROVIDER`: 사용할 AI 제공자 (`gemini` 또는 `claude`)
+- `LLM_PROVIDER`: 사용할 AI 제공자 (`gemini`, `claude`, `mock`)
 - `DASHBOARD_PORT`: 대시보드 서버 포트 (기본값: 3000)

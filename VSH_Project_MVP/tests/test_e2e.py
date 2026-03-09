@@ -41,7 +41,10 @@ def reset_log_json():
     _clear_log_json()
 
 @pytest.fixture
-def pipeline():
+def pipeline(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     return PipelineFactory.create()
 
 def test_e2e_scan_vulnerable_file(pipeline):

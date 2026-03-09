@@ -1,8 +1,8 @@
 import os
+from typing import List
 from .base_pipeline import BasePipeline
 from .analysis_pipeline import AnalysisPipeline
 from modules.scanner.mock_semgrep_scanner import MockSemgrepScanner as SemgrepScanner
-from modules.scanner.treesitter_scanner import TreeSitterScanner
 from modules.scanner.sbom_scanner import SBOMScanner
 from modules.analyzer.analyzer_factory import AnalyzerFactory
 from repository.knowledge_repo import MockKnowledgeRepo
@@ -13,6 +13,20 @@ class PipelineFactory:
     """
     모든 의존성을 조립하여 파이프라인 인스턴스를 생성하는 팩토리 클래스.
     """
+
+    @staticmethod
+    def _create_scanners(knowledge_repo) -> List:
+        scanners = [SemgrepScanner(knowledge_repo=knowledge_repo)]
+
+        try:
+            from modules.scanner.treesitter_scanner import TreeSitterScanner
+        except ModuleNotFoundError as exc:
+            print(f"[WARN] TreeSitterScanner unavailable: {exc}")
+        else:
+            scanners.append(TreeSitterScanner(knowledge_repo=knowledge_repo))
+
+        scanners.append(SBOMScanner())
+        return scanners
 
     @staticmethod
     def create() -> BasePipeline:
@@ -32,23 +46,24 @@ class PipelineFactory:
         log_repo = MockLogRepo()
 
         # 2. Scanner 인스턴스화
-        scanners = [
-            SemgrepScanner(knowledge_repo=knowledge_repo),
-            TreeSitterScanner(knowledge_repo=knowledge_repo),
-            SBOMScanner()
-        ]
+        scanners = PipelineFactory._create_scanners(knowledge_repo)
 
         # 3. Analyzer 인스턴스화 (LLM_PROVIDER에 따라 분기)
         provider = os.getenv("LLM_PROVIDER", "gemini").lower()
-        if provider == "gemini":
+        if provider == "mock":
+            api_key = ""
+        elif provider == "gemini":
             api_key = os.getenv("GEMINI_API_KEY")
         elif provider == "claude":
             api_key = os.getenv("ANTHROPIC_API_KEY")
         else:
             raise ValueError(f"지원하지 않는 provider: {provider}")
 
-        if not api_key:
-            raise ValueError(f"{provider.upper()}_API_KEY가 .env에 설정되지 않았습니다.")
+        if provider != "mock" and not api_key:
+            raise ValueError(
+                f"{provider.upper()}_API_KEY가 .env에 설정되지 않았습니다. "
+                "로컬 테스트만 필요하면 LLM_PROVIDER=mock 을 사용하세요."
+            )
         
         analyzer = AnalyzerFactory.create(provider, api_key)
 

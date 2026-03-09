@@ -93,7 +93,7 @@ class MockLogRepo(BaseWriteRepository):
         Returns:
             bool: 성공 여부
         """
-        valid_statuses = {"pending", "accepted", "dismissed"}
+        valid_statuses = {"pending", "accepted", "dismissed", "analysis_failed"}
         if status not in valid_statuses:
             raise ValueError(f"Invalid status: '{status}'. Must be one of {valid_statuses}")
 

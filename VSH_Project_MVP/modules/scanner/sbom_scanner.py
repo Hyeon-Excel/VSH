@@ -22,7 +22,7 @@ class SBOMScanner(BaseScanner):
         findings: List[Vulnerability] = []
 
         if not os.path.exists(req_path):
-            return ScanResult(file_path=file_path, language="python", findings=[])
+            return ScanResult(file_path=req_path, language="python", findings=[])
 
         try:
             with open(req_path, "r", encoding="utf-8") as f:
@@ -55,6 +55,7 @@ class SBOMScanner(BaseScanner):
                             
                         if is_vulnerable:
                             v = Vulnerability(
+                                file_path=req_path,
                                 cwe_id="CWE-829",
                                 severity="HIGH",
                                 line_number=line_idx + 1,
@@ -64,7 +65,7 @@ class SBOMScanner(BaseScanner):
         except Exception as e:
              print(f"[ERROR] SBOMScanner read error: {e}")
              
-        return ScanResult(file_path=file_path, language="python", findings=findings)
+        return ScanResult(file_path=req_path, language="python", findings=findings)
 
     def supported_languages(self) -> List[str]:
         return ["python"]
