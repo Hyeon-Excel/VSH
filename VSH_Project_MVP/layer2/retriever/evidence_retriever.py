@@ -1,7 +1,8 @@
 import re
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+from .chroma_retriever import ChromaRetriever
 from models.scan_result import ScanResult
 
 try:
@@ -14,6 +15,9 @@ class EvidenceRetriever:
     """
     finding별로 관련 근거와 수정 맥락을 정리하는 L2 retrieval 컴포넌트.
     """
+
+    def __init__(self, chroma_retriever: Optional[ChromaRetriever] = None):
+        self.chroma_retriever = chroma_retriever or ChromaRetriever()
 
     def retrieve(
         self,
@@ -30,13 +34,17 @@ class EvidenceRetriever:
             issue_id = self._build_issue_id(file_path, finding.cwe_id, finding.line_number)
             knowledge_entry = knowledge_map.get(finding.cwe_id, {})
             fix_entry = fix_map.get(finding.cwe_id, {})
+            chroma_docs = self._query_chroma(finding.cwe_id, finding.code_snippet)
 
             evidence_map[issue_id] = {
                 "issue_id": issue_id,
                 "file_path": file_path,
                 "cwe_id": finding.cwe_id,
                 "line_number": finding.line_number,
-                "knowledge_description": knowledge_entry.get("description"),
+                "knowledge_description": self._build_knowledge_description(
+                    knowledge_entry,
+                    chroma_docs,
+                ),
                 "remediation_summary": self._build_remediation_summary(
                     finding.cwe_id,
                     fix_entry,
@@ -48,16 +56,19 @@ class EvidenceRetriever:
                     finding.cwe_id,
                     finding.code_snippet,
                     knowledge_entry,
+                    chroma_docs,
                 ),
                 "evidence_refs": self._build_evidence_refs(
                     finding.cwe_id,
                     knowledge_entry,
                     finding.code_snippet,
+                    chroma_docs,
                 ),
                 "primary_reference": self._build_primary_reference(
                     finding.cwe_id,
                     knowledge_entry,
                     finding.code_snippet,
+                    chroma_docs,
                 ),
                 "recommended_fix": (
                     fix_entry.get("safe")
@@ -67,6 +78,20 @@ class EvidenceRetriever:
             }
 
         return evidence_map
+
+    def _query_chroma(self, cwe_id: str, code_snippet: str) -> List[Dict]:
+        if not self.chroma_retriever.ready:
+            return []
+        return self.chroma_retriever.query(cwe_id, code_snippet, n_results=4)
+
+    @staticmethod
+    def _build_knowledge_description(knowledge_entry: Dict, chroma_docs: List[Dict]) -> str | None:
+        if knowledge_entry.get("description"):
+            return knowledge_entry["description"]
+
+        top_doc = chroma_docs[0] if chroma_docs else {}
+        text = (top_doc.get("text") or "").strip()
+        return text[:300] if text else None
 
     def _build_remediation_summary(
         self,
@@ -93,6 +118,7 @@ class EvidenceRetriever:
         cwe_id: str,
         code_snippet: str,
         knowledge_entry: Dict,
+        chroma_docs: List[Dict],
     ) -> str:
         file_name = Path(file_path).name
         if cwe_id == "CWE-829":
@@ -109,6 +135,10 @@ class EvidenceRetriever:
         description = knowledge_entry.get("description")
         if description:
             return f"{file_name}에서 `{cwe_id}` 패턴과 일치하는 코드가 발견되었습니다. {description}."
+
+        chroma_context = self._build_chroma_summary(chroma_docs)
+        if chroma_context:
+            return f"{file_name}에서 `{cwe_id}` 관련 위험 코드가 탐지되었습니다. {chroma_context}"
         return f"{file_name}에서 `{cwe_id}`와 관련된 위험 코드가 탐지되었습니다."
 
     def _build_evidence_refs(
@@ -116,12 +146,15 @@ class EvidenceRetriever:
         cwe_id: str,
         knowledge_entry: Dict,
         code_snippet: str,
+        chroma_docs: List[Dict],
     ) -> List[str]:
         refs: List[str] = []
         refs.append(cwe_id)
 
         if knowledge_entry.get("reference"):
             refs.append(knowledge_entry["reference"])
+
+        refs.extend(self._build_chroma_refs(chroma_docs))
 
         if cwe_id == "CWE-829":
             package_name, _ = self._parse_requirement(code_snippet)
@@ -140,9 +173,14 @@ class EvidenceRetriever:
         cwe_id: str,
         knowledge_entry: Dict,
         code_snippet: str,
+        chroma_docs: List[Dict],
     ) -> str | None:
         if knowledge_entry.get("reference"):
             return knowledge_entry["reference"]
+
+        chroma_reference = self._build_primary_chroma_reference(chroma_docs)
+        if chroma_reference:
+            return chroma_reference
 
         if cwe_id == "CWE-829":
             package_name, _ = self._parse_requirement(code_snippet)
@@ -159,6 +197,51 @@ class EvidenceRetriever:
         if package_name and safe_floor:
             return f"{package_name}>={safe_floor}"
         return None
+
+    @staticmethod
+    def _build_chroma_summary(chroma_docs: List[Dict]) -> str | None:
+        if not chroma_docs:
+            return None
+
+        top_doc = chroma_docs[0]
+        source = top_doc.get("source") or "RAG"
+        title = (
+            top_doc.get("kisa_article")
+            or top_doc.get("title")
+            or top_doc.get("source_id")
+            or top_doc.get("cve_id")
+        )
+        text = (top_doc.get("text") or "").strip()
+        if not text:
+            return None
+        prefix = f"[{source}]"
+        if title:
+            prefix = f"{prefix} {title}"
+        return f"{prefix} {text[:220]}"
+
+    @staticmethod
+    def _build_chroma_refs(chroma_docs: List[Dict]) -> List[str]:
+        refs: List[str] = []
+        for doc in chroma_docs:
+            source = doc.get("source") or "RAG"
+            identifier = (
+                doc.get("kisa_article")
+                or doc.get("source_id")
+                or doc.get("owasp_id")
+                or doc.get("cve_id")
+                or doc.get("title")
+            )
+            if identifier:
+                refs.append(f"{source}: {identifier}")
+            cvss_score = doc.get("cvss_score")
+            if cvss_score:
+                refs.append(f"CVSS: {cvss_score}")
+        return list(dict.fromkeys(refs))
+
+    @staticmethod
+    def _build_primary_chroma_reference(chroma_docs: List[Dict]) -> str | None:
+        refs = EvidenceRetriever._build_chroma_refs(chroma_docs)
+        return refs[0] if refs else None
 
     @staticmethod
     def _parse_requirement(requirement_line: str) -> tuple[str | None, str | None]:
