@@ -25,6 +25,11 @@ class FixSuggestion(BaseModel):
     kisa_reference: str | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     evidence_summary: str | None = None
+    registry_status: str | None = None
+    registry_summary: str | None = None
+    osv_status: str | None = None
+    osv_summary: str | None = None
+    verification_summary: str | None = None
     original_code: str
     fixed_code: str
     description: str

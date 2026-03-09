@@ -2,7 +2,7 @@ import json
 import re
 from typing import List, Dict
 import anthropic
-from ..base_module import BaseAnalyzer
+from modules.base_module import BaseAnalyzer
 from models.scan_result import ScanResult
 from models.fix_suggestion import FixSuggestion
 

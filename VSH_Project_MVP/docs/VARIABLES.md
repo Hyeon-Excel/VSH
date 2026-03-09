@@ -36,6 +36,11 @@
 - `kisa_reference`: 연관된 KISA 또는 보안 기준 참조
 - `evidence_refs`: retrieval이 수집한 근거 참조 목록
 - `evidence_summary`: retrieval이 정리한 근거 요약
+- `registry_status`: registry verifier 결과 (`FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`)
+- `registry_summary`: registry verifier 상세 요약
+- `osv_status`: OSV verifier 결과 (`FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`)
+- `osv_summary`: OSV verifier 상세 요약
+- `verification_summary`: verifier 결과를 합친 최종 요약
 - `analysis_error`: L2 분석 실패 시 저장되는 오류 메시지
 
 ### Status Allowed Values

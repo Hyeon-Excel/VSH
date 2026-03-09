@@ -4,8 +4,10 @@ from .base_pipeline import BasePipeline
 from .analysis_pipeline import AnalysisPipeline
 from modules.scanner.mock_semgrep_scanner import MockSemgrepScanner as SemgrepScanner
 from modules.scanner.sbom_scanner import SBOMScanner
-from modules.analyzer.analyzer_factory import AnalyzerFactory
-from modules.retriever.evidence_retriever import EvidenceRetriever
+from layer2.analyzer.analyzer_factory import AnalyzerFactory
+from layer2.retriever.evidence_retriever import EvidenceRetriever
+from layer2.verifier.registry_verifier import RegistryVerifier
+from layer2.verifier.osv_verifier import OsvVerifier
 from repository.knowledge_repo import MockKnowledgeRepo
 from repository.fix_repo import MockFixRepo
 from repository.log_repo import MockLogRepo
@@ -73,6 +75,8 @@ class PipelineFactory:
             scanners=scanners,
             analyzer=analyzer,
             evidence_retriever=EvidenceRetriever(),
+            registry_verifier=RegistryVerifier(),
+            osv_verifier=OsvVerifier(),
             knowledge_repo=knowledge_repo,
             fix_repo=fix_repo,
             log_repo=log_repo

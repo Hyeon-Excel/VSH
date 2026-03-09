@@ -1,6 +1,6 @@
 from models.scan_result import ScanResult
 from models.vulnerability import Vulnerability
-from modules.retriever.evidence_retriever import EvidenceRetriever
+from layer2.retriever.evidence_retriever import EvidenceRetriever
 from repository.fix_repo import MockFixRepo
 from repository.knowledge_repo import MockKnowledgeRepo
 

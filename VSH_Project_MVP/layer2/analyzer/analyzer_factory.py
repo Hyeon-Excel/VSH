@@ -1,4 +1,4 @@
-from ..base_module import BaseAnalyzer
+from modules.base_module import BaseAnalyzer
 
 class AnalyzerFactory:
     """

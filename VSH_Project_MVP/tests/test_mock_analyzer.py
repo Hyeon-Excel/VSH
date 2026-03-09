@@ -1,10 +1,10 @@
-from modules.analyzer.mock_analyzer import MockAnalyzer
+from layer2.analyzer.mock_analyzer import MockAnalyzer
 from models.scan_result import ScanResult
 from models.vulnerability import Vulnerability
 from repository.fix_repo import MockFixRepo
 from repository.knowledge_repo import MockKnowledgeRepo
 from pipeline.pipeline_factory import PipelineFactory
-from modules.retriever.evidence_retriever import EvidenceRetriever
+from layer2.retriever.evidence_retriever import EvidenceRetriever
 
 
 def test_mock_analyzer_uses_fix_repo_templates():

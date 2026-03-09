@@ -330,6 +330,9 @@
                         'Evidence Refs',
                         Array.isArray(log.evidence_refs) ? log.evidence_refs.join('\n') : '',
                     ),
+                    renderAnalysisItem('Registry Verification', formatVerification(log.registry_status, log.registry_summary)),
+                    renderAnalysisItem('OSV Verification', formatVerification(log.osv_status, log.osv_summary)),
+                    renderAnalysisItem('Verification Summary', log.verification_summary),
                     renderAnalysisItem('L2 오류', log.analysis_error, true),
                 ].filter(Boolean).join('');
 
@@ -385,6 +388,16 @@
                     <p>${escapeHtml(value)}</p>
                 </div>
             `;
+        }
+
+        function formatVerification(status, summary) {
+            if (!status && !summary) {
+                return '';
+            }
+            if (status && summary) {
+                return `[${status}] ${summary}`;
+            }
+            return status || summary || '';
         }
 
         function toggleFixedCode(issueId) {
