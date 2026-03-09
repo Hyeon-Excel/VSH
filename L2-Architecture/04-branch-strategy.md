@@ -41,7 +41,7 @@ main
 - `v0.5.x`: patch 및 integration
 - `v1.0.0`: `layer2 -> main` 머지 검토 가능한 안정 상태
 
-현재 작업 버전은 `v0.6.0-dev`로 본다.
+현재 작업 버전은 `v0.7.0-dev`로 본다.
 
 ## 5. 히스토리 기록 규칙
 
@@ -73,17 +73,17 @@ main
 | 2026-03-09 | v0.3.0 | committed | `0c76f33` | evidence retrieval | `EvidenceRetriever` 추가, pipeline -> retriever -> analyzer 흐름 연결, evidence refs / summary 응답 및 로그 반영, 대시보드 evidence 표면 추가 | `pytest tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `11 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-09 | v0.4.0 | committed | `f59a925` | verifier 구현 및 L2 패키지 분리 | `RegistryVerifier`, `OsvVerifier` 추가, pipeline verification 후처리 연결, verifier 결과를 response/log/dashboard에 반영, L2 전용 파일을 `layer2/` 패키지로 이동 | `pytest tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `14 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-09 | v0.5.0 | committed | `657b566` | patch builder 구현 | `PatchBuilder` 추가, verifier 이후 patch preview 생성, response/log/dashboard에 patch diff 반영, patch 테스트 추가 | `pytest tests/test_l2_patch_builder.py tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `16 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
-| 2026-03-09 | v0.6.0-dev | working tree | `uncommitted` | integration 품질 보강 | `processing_trace`, `processing_summary`, run-level `summary` 추가, response/log/dashboard에서 처리 경로 가시성 강화 | `pytest tests/test_l2_patch_builder.py tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `16 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
+| 2026-03-09 | v0.7.0-dev | working tree | `uncommitted` | L3 handoff 응답 정제 | `category`, `remediation_kind`, `target_ref` 추가, run summary에 code/supply chain 카운트 반영, response/log/dashboard에 handoff 필드 노출 | `pytest tests/test_l2_patch_builder.py tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `16 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 
 ## 7. 다음 버전 목표
 
-다음 목표 버전은 `v0.7.0`이다.
+다음 목표 버전은 `v0.8.0`이다.
 
 범위:
 
 - patch / recommendation 출력 형식 정교화
 - L3 연계를 위한 응답 정제
-- 통합 품질 보강
+- 최종 통합 품질 보강
 - `layer2 -> main` 머지 전 최종 안정화
 
 ## 8. 문서 유지 방법

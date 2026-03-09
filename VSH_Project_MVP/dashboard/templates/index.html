@@ -336,6 +336,9 @@
                     renderAnalysisItem('Patch Status', log.patch_status),
                     renderAnalysisItem('Patch Summary', log.patch_summary),
                     renderAnalysisItem('Processing Summary', log.processing_summary),
+                    renderAnalysisItem('Category', log.category),
+                    renderAnalysisItem('Remediation Kind', log.remediation_kind),
+                    renderAnalysisItem('Target Ref', log.target_ref),
                     renderAnalysisItem(
                         'Processing Trace',
                         Array.isArray(log.processing_trace) ? log.processing_trace.join('\n') : '',

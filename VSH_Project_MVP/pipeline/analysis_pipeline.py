@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Dict, List, Optional
 from .base_pipeline import BasePipeline
 from modules.base_module import BaseScanner, BaseAnalyzer
@@ -132,6 +133,9 @@ class AnalysisPipeline(BasePipeline):
                             verification_map,
                         )
                         patch_context = self.patch_builder.build(matching_vuln, suggestion)
+                        category = self._classify_category(matching_vuln.cwe_id)
+                        remediation_kind = self._build_remediation_kind(category, patch_context)
+                        target_ref = self._build_target_ref(finding_file_path, matching_vuln, category)
                         processing_trace = self._build_processing_trace(
                             evidence_context=evidence_context,
                             verification_context=verification_context,
@@ -165,6 +169,9 @@ class AnalysisPipeline(BasePipeline):
                                 "patch_diff": suggestion.patch_diff or patch_context.get("patch_diff"),
                                 "processing_trace": suggestion.processing_trace or processing_trace,
                                 "processing_summary": suggestion.processing_summary or self._summarize_trace(processing_trace),
+                                "category": suggestion.category or category,
+                                "remediation_kind": suggestion.remediation_kind or remediation_kind,
+                                "target_ref": suggestion.target_ref or target_ref,
                             }
                         )
                         log_data = {
@@ -191,6 +198,9 @@ class AnalysisPipeline(BasePipeline):
                             "patch_diff": normalized_suggestion.patch_diff,
                             "processing_trace": normalized_suggestion.processing_trace,
                             "processing_summary": normalized_suggestion.processing_summary,
+                            "category": normalized_suggestion.category,
+                            "remediation_kind": normalized_suggestion.remediation_kind,
+                            "target_ref": normalized_suggestion.target_ref,
                             "status": "pending"
                         }
                         suggestion.issue_id = normalized_suggestion.issue_id
@@ -210,6 +220,9 @@ class AnalysisPipeline(BasePipeline):
                         suggestion.patch_diff = normalized_suggestion.patch_diff
                         suggestion.processing_trace = normalized_suggestion.processing_trace
                         suggestion.processing_summary = normalized_suggestion.processing_summary
+                        suggestion.category = normalized_suggestion.category
+                        suggestion.remediation_kind = normalized_suggestion.remediation_kind
+                        suggestion.target_ref = normalized_suggestion.target_ref
                         self.log_repo.save(log_data)
 
         # 8. 결과 dict로 변환 (Pydantic model_dump 사용)
@@ -329,6 +342,13 @@ class AnalysisPipeline(BasePipeline):
             "patch_status": None,
             "patch_summary": None,
             "patch_diff": None,
+            "category": cls._classify_category(finding.cwe_id),
+            "remediation_kind": None,
+            "target_ref": cls._build_target_ref(
+                finding_file_path,
+                finding,
+                cls._classify_category(finding.cwe_id),
+            ),
             "processing_trace": cls._build_processing_trace(
                 evidence_context=evidence_context,
                 verification_context=verification_context,
@@ -474,6 +494,14 @@ class AnalysisPipeline(BasePipeline):
         return {
             "findings_total": len(findings),
             "fix_suggestions_total": len(fix_suggestions),
+            "code_findings_total": sum(1 for finding in findings if finding.cwe_id != "CWE-829"),
+            "supply_chain_findings_total": sum(1 for finding in findings if finding.cwe_id == "CWE-829"),
+            "code_fix_suggestions_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.category == "code"
+            ),
+            "supply_chain_fix_suggestions_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.category == "supply_chain"
+            ),
             "verified_total": sum(
                 1
                 for suggestion in fix_suggestions
@@ -483,3 +511,33 @@ class AnalysisPipeline(BasePipeline):
                 1 for suggestion in fix_suggestions if suggestion.patch_status == "GENERATED"
             ),
         }
+
+    @staticmethod
+    def _classify_category(cwe_id: str) -> str:
+        return "supply_chain" if cwe_id == "CWE-829" else "code"
+
+    @staticmethod
+    def _build_remediation_kind(category: str, patch_context: Dict) -> str | None:
+        patch_status = patch_context.get("patch_status")
+        if category == "supply_chain":
+            if patch_status == "GENERATED":
+                return "version_bump_patch"
+            return "dependency_recommendation"
+        if patch_status == "GENERATED":
+            return "code_patch"
+        return "code_recommendation"
+
+    @classmethod
+    def _build_target_ref(cls, file_path: str, finding: Vulnerability, category: str) -> str:
+        if category == "supply_chain":
+            dependency_name = cls._parse_dependency_name(finding.code_snippet)
+            if dependency_name:
+                return f"dependency:{dependency_name}"
+        return f"{file_path}:{finding.line_number}"
+
+    @staticmethod
+    def _parse_dependency_name(requirement_line: str) -> str | None:
+        match = re.match(r"^([a-zA-Z0-9_\-]+)", requirement_line.strip())
+        if not match:
+            return None
+        return match.group(1).lower()

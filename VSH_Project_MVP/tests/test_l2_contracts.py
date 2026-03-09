@@ -83,6 +83,9 @@ def test_fix_suggestion_preserves_l2_metadata():
     assert payload["patch_diff"] is None
     assert payload["processing_trace"] == []
     assert payload["processing_summary"] is None
+    assert payload["category"] is None
+    assert payload["remediation_kind"] is None
+    assert payload["target_ref"] is None
 
 
 def test_pipeline_package_exports_factory_without_optional_import_masking():
@@ -138,6 +141,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["fix_suggestions"][0]["patch_summary"]
     assert "-cursor.execute(query % user_input)" in (result["fix_suggestions"][0]["patch_diff"] or "")
     assert "+cursor.execute(query, (user_input,))" in (result["fix_suggestions"][0]["patch_diff"] or "")
+    assert result["fix_suggestions"][0]["category"] == "code"
+    assert result["fix_suggestions"][0]["remediation_kind"] == "code_patch"
+    assert result["fix_suggestions"][0]["target_ref"] == f"{vulnerable_file}:7"
     assert result["fix_suggestions"][0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
@@ -158,6 +164,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert log_repo.saved[0]["patch_status"] == "GENERATED"
     assert log_repo.saved[0]["patch_summary"]
     assert log_repo.saved[0]["patch_diff"]
+    assert log_repo.saved[0]["category"] == "code"
+    assert log_repo.saved[0]["remediation_kind"] == "code_patch"
+    assert log_repo.saved[0]["target_ref"] == f"{vulnerable_file}:7"
     assert log_repo.saved[0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
@@ -212,6 +221,9 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
     assert "-requests==2.9.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
     assert "+requests>=2.20.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
+    assert result["fix_suggestions"][0]["category"] == "supply_chain"
+    assert result["fix_suggestions"][0]["remediation_kind"] == "version_bump_patch"
+    assert result["fix_suggestions"][0]["target_ref"] == "dependency:requests"
     assert result["fix_suggestions"][0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
@@ -224,7 +236,12 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     assert log_repo.saved[0]["issue_id"] == f"{requirements_file}_CWE-829_1"
     assert log_repo.saved[0]["verification_summary"]
     assert log_repo.saved[0]["patch_summary"]
+    assert log_repo.saved[0]["category"] == "supply_chain"
+    assert log_repo.saved[0]["remediation_kind"] == "version_bump_patch"
+    assert log_repo.saved[0]["target_ref"] == "dependency:requests"
     assert result["summary"]["verified_total"] == 1
+    assert result["summary"]["supply_chain_findings_total"] == 1
+    assert result["summary"]["supply_chain_fix_suggestions_total"] == 1
 
 
 def test_pipeline_logs_analysis_failures(tmp_path):
@@ -260,6 +277,8 @@ def test_pipeline_logs_analysis_failures(tmp_path):
     assert log_repo.saved[0]["osv_status"] is None
     assert log_repo.saved[0]["patch_status"] is None
     assert log_repo.saved[0]["patch_diff"] is None
+    assert log_repo.saved[0]["category"] == "code"
+    assert log_repo.saved[0]["target_ref"] == f"{vulnerable_file}:7"
     assert log_repo.saved[0]["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
