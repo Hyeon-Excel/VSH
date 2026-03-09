@@ -34,6 +34,9 @@ class FixSuggestion(BaseModel):
     osv_status: str | None = None
     osv_summary: str | None = None
     verification_summary: str | None = None
+    decision_status: str | None = None
+    confidence_score: int = Field(default=0, ge=0, le=100)
+    confidence_reason: str | None = None
     patch_status: str | None = None
     patch_summary: str | None = None
     patch_diff: str | None = None

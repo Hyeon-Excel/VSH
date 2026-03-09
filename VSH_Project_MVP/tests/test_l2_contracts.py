@@ -100,6 +100,9 @@ class DummyEvidenceRetriever:
                 "chroma_status": self._chroma_status,
                 "chroma_summary": self._chroma_summary,
                 "chroma_hits": self._chroma_hits,
+                "decision_status": None,
+                "confidence_score": 0,
+                "confidence_reason": None,
             }
         return evidence_map
 
@@ -135,6 +138,9 @@ def test_fix_suggestion_preserves_l2_metadata():
     assert payload["osv_status"] is None
     assert payload["osv_summary"] is None
     assert payload["verification_summary"] is None
+    assert payload["decision_status"] is None
+    assert payload["confidence_score"] == 0
+    assert payload["confidence_reason"] is None
     assert payload["patch_status"] is None
     assert payload["patch_summary"] is None
     assert payload["patch_diff"] is None
@@ -198,6 +204,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["fix_suggestions"][0]["retrieval_backend"] == "static_only"
     assert result["fix_suggestions"][0]["chroma_status"] == "MISSING_DEPENDENCY"
     assert result["fix_suggestions"][0]["chroma_hits"] == 0
+    assert result["fix_suggestions"][0]["decision_status"] == "confirmed"
+    assert result["fix_suggestions"][0]["confidence_score"] > 0
+    assert result["fix_suggestions"][0]["confidence_reason"]
     assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
     assert result["fix_suggestions"][0]["patch_summary"]
     assert "-cursor.execute(query % user_input)" in (result["fix_suggestions"][0]["patch_diff"] or "")
@@ -227,6 +236,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert log_repo.saved[0]["chroma_hits"] == 0
     assert log_repo.saved[0]["registry_status"] is None
     assert log_repo.saved[0]["osv_status"] is None
+    assert log_repo.saved[0]["decision_status"] == "confirmed"
+    assert log_repo.saved[0]["confidence_score"] > 0
+    assert log_repo.saved[0]["confidence_reason"]
     assert log_repo.saved[0]["patch_status"] == "GENERATED"
     assert log_repo.saved[0]["patch_summary"]
     assert log_repo.saved[0]["patch_diff"]
@@ -247,6 +259,8 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["summary"]["chroma_status"] == "MISSING_DEPENDENCY"
     assert result["summary"]["retrieval_static_only_total"] == 1
     assert result["summary"]["chroma_enriched_total"] == 0
+    assert result["summary"]["decision_confirmed_total"] == 1
+    assert result["summary"]["confidence_high_total"] == 0
 
 
 def test_pipeline_passes_verification_context_into_analyzer(tmp_path):
@@ -337,6 +351,9 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
     assert "-requests==2.9.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
     assert "+requests>=2.20.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
+    assert result["fix_suggestions"][0]["decision_status"] == "confirmed"
+    assert result["fix_suggestions"][0]["confidence_score"] >= 85
+    assert result["fix_suggestions"][0]["confidence_reason"]
     assert result["fix_suggestions"][0]["category"] == "supply_chain"
     assert result["fix_suggestions"][0]["remediation_kind"] == "version_bump_patch"
     assert result["fix_suggestions"][0]["target_ref"] == "dependency:requests"
@@ -353,6 +370,9 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     assert log_repo.saved[0]["file_path"] == str(requirements_file)
     assert log_repo.saved[0]["issue_id"] == f"{requirements_file}_CWE-829_1"
     assert log_repo.saved[0]["verification_summary"]
+    assert log_repo.saved[0]["decision_status"] == "confirmed"
+    assert log_repo.saved[0]["confidence_score"] >= 85
+    assert log_repo.saved[0]["confidence_reason"]
     assert log_repo.saved[0]["patch_summary"]
     assert log_repo.saved[0]["category"] == "supply_chain"
     assert log_repo.saved[0]["remediation_kind"] == "version_bump_patch"
@@ -360,6 +380,8 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     assert result["summary"]["verified_total"] == 1
     assert result["summary"]["supply_chain_findings_total"] == 1
     assert result["summary"]["supply_chain_fix_suggestions_total"] == 1
+    assert result["summary"]["decision_confirmed_total"] == 1
+    assert result["summary"]["confidence_high_total"] == 1
 
 
 def test_pipeline_logs_analysis_failures(tmp_path):
@@ -394,6 +416,9 @@ def test_pipeline_logs_analysis_failures(tmp_path):
     assert log_repo.saved[0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
     assert log_repo.saved[0]["registry_status"] is None
     assert log_repo.saved[0]["osv_status"] is None
+    assert log_repo.saved[0]["decision_status"] == "analysis_failed"
+    assert log_repo.saved[0]["confidence_score"] == 0
+    assert log_repo.saved[0]["confidence_reason"]
     assert log_repo.saved[0]["patch_status"] is None
     assert log_repo.saved[0]["patch_diff"] is None
     assert log_repo.saved[0]["category"] == "code"

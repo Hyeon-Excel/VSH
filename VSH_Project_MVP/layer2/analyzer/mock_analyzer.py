@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 from modules.base_module import BaseAnalyzer
 from models.fix_suggestion import FixSuggestion
 from models.scan_result import ScanResult
+from .confidence_support import build_decision_metadata
 
 try:
     from config import VULNERABLE_PACKAGES
@@ -68,6 +69,10 @@ class MockAnalyzer(BaseAnalyzer):
             description_text = evidence_context.get("remediation_summary") or description
             if verification_summary and verification_summary not in description_text:
                 description_text = f"{description_text} 검증 결과: {verification_summary}"
+            decision_status, confidence_score, confidence_reason = build_decision_metadata(
+                finding.cwe_id,
+                evidence_context,
+            )
 
             suggestions.append(
                 FixSuggestion(
@@ -92,6 +97,9 @@ class MockAnalyzer(BaseAnalyzer):
                     osv_status=evidence_context.get("osv_status"),
                     osv_summary=evidence_context.get("osv_summary"),
                     verification_summary=verification_summary,
+                    decision_status=decision_status,
+                    confidence_score=confidence_score,
+                    confidence_reason=confidence_reason,
                     original_code=finding.code_snippet,
                     fixed_code=evidence_context.get("recommended_fix") or fixed_code,
                     description=description_text,

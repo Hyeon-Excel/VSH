@@ -282,7 +282,8 @@
             const total = logs.length;
             const pendingCount = logs.filter(l => l.status === 'pending').length;
             const failedCount = logs.filter(l => l.status === 'analysis_failed').length;
-            document.getElementById('stats-container').textContent = `총 ${total}개 취약점 | pending: ${pendingCount}개 | failed: ${failedCount}개`;
+            const highConfidenceCount = logs.filter(l => Number(l.confidence_score || 0) >= 85).length;
+            document.getElementById('stats-container').textContent = `총 ${total}개 취약점 | pending: ${pendingCount}개 | failed: ${failedCount}개 | high confidence: ${highConfidenceCount}개`;
         }
 
         function renderLogs(logs) {
@@ -337,6 +338,9 @@
                     renderAnalysisItem('Registry Verification', formatVerification(log.registry_status, log.registry_summary)),
                     renderAnalysisItem('OSV Verification', formatVerification(log.osv_status, log.osv_summary)),
                     renderAnalysisItem('Verification Summary', log.verification_summary),
+                    renderAnalysisItem('Decision Status', log.decision_status),
+                    renderAnalysisItem('Confidence Score', log.confidence_score),
+                    renderAnalysisItem('Confidence Reason', log.confidence_reason),
                     renderAnalysisItem('Patch Status', log.patch_status),
                     renderAnalysisItem('Patch Summary', log.patch_summary),
                     renderAnalysisItem('Processing Summary', log.processing_summary),
@@ -398,7 +402,7 @@
         }
 
         function renderAnalysisItem(label, value, isError = false) {
-            if (!value) {
+            if (value === null || value === undefined || value === '') {
                 return '';
             }
             const className = isError ? 'analysis-item error' : 'analysis-item';
