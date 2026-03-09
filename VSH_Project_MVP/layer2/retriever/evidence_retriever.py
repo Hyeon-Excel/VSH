@@ -106,6 +106,8 @@ class EvidenceRetriever:
     def _query_chroma(self, cwe_id: str, code_snippet: str) -> List[Dict]:
         if not self.chroma_retriever.ready:
             return []
+        if hasattr(self.chroma_retriever, "query_related"):
+            return self.chroma_retriever.query_related(cwe_id, code_snippet, n_results=4)
         return self.chroma_retriever.query(cwe_id, code_snippet, n_results=4)
 
     @staticmethod
@@ -244,21 +246,26 @@ class EvidenceRetriever:
         if not chroma_docs:
             return None
 
-        top_doc = chroma_docs[0]
-        source = top_doc.get("source") or "RAG"
-        title = (
-            top_doc.get("kisa_article")
-            or top_doc.get("title")
-            or top_doc.get("source_id")
-            or top_doc.get("cve_id")
-        )
-        text = (top_doc.get("text") or "").strip()
-        if not text:
+        parts: List[str] = []
+        for doc in chroma_docs[:2]:
+            source = doc.get("source") or "RAG"
+            title = (
+                doc.get("kisa_article")
+                or doc.get("title")
+                or doc.get("source_id")
+                or doc.get("cve_id")
+            )
+            text = (doc.get("text") or "").strip()
+            if not text:
+                continue
+            prefix = f"[{source}]"
+            if title:
+                prefix = f"{prefix} {title}"
+            parts.append(f"{prefix} {text[:140]}")
+
+        if not parts:
             return None
-        prefix = f"[{source}]"
-        if title:
-            prefix = f"{prefix} {title}"
-        return f"{prefix} {text[:220]}"
+        return " | ".join(parts)
 
     @staticmethod
     def _build_chroma_refs(chroma_docs: List[Dict]) -> List[str]:

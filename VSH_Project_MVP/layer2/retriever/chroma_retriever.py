@@ -64,25 +64,29 @@ class ChromaRetriever:
         return "Chroma RAG가 비활성 상태입니다."
 
     def query(self, cwe_id: str, code_snippet: str = "", n_results: int = 5) -> list[dict]:
+        return self.query_related(cwe_id, code_snippet, n_results=n_results)
+
+    def query_related(self, cwe_id: str, code_snippet: str = "", n_results: int = 5) -> list[dict]:
         if not self.ready:
             return []
 
-        query_text = f"{cwe_id} {code_snippet[:300]}".strip()
-        where = {"cwe": {"$eq": cwe_id}} if cwe_id else None
+        query_text = self._build_query_text(cwe_id, code_snippet)
+        exact_docs = self._query_collection(
+            query_text=query_text,
+            n_results=n_results,
+            where={"cwe": {"$eq": cwe_id}} if cwe_id else None,
+            default_cwe=cwe_id,
+        )
+        if len(exact_docs) >= n_results:
+            return exact_docs[:n_results]
 
-        try:
-            raw = self._collection.query(
-                query_texts=[query_text],
-                n_results=min(n_results, max(1, self._collection.count())),
-                where=where,
-                include=["documents", "metadatas"],
-            )
-            docs = raw.get("documents", [[]])[0]
-            metas = raw.get("metadatas", [[]])[0]
-        except Exception:
-            return []
-
-        return self._parse_raw(docs, metas, cwe_id)
+        broad_docs = self._query_collection(
+            query_text=query_text,
+            n_results=max(n_results * 3, n_results + 2),
+            where=None,
+            default_cwe=cwe_id,
+        )
+        return self._merge_ranked_results(exact_docs, broad_docs, cwe_id, n_results)
 
     def query_by_source(
         self,
@@ -94,22 +98,18 @@ class ChromaRetriever:
         if not self.ready:
             return []
 
-        query_text = f"{cwe_id} {code_snippet[:300]}".strip()
-        where = {"$and": [{"cwe": {"$eq": cwe_id}}, {"source": {"$eq": source}}]}
+        filters = [{"source": {"$eq": source}}]
+        if cwe_id:
+            filters.insert(0, {"cwe": {"$eq": cwe_id}})
 
-        try:
-            raw = self._collection.query(
-                query_texts=[query_text],
-                n_results=min(n_results, max(1, self._collection.count())),
-                where=where,
-                include=["documents", "metadatas"],
-            )
-            docs = raw.get("documents", [[]])[0]
-            metas = raw.get("metadatas", [[]])[0]
-        except Exception:
-            return []
-
-        return self._parse_raw(docs, metas, cwe_id)
+        where = filters[0] if len(filters) == 1 else {"$and": filters}
+        query_text = self._build_query_text(cwe_id, code_snippet)
+        return self._query_collection(
+            query_text=query_text,
+            n_results=n_results,
+            where=where,
+            default_cwe=cwe_id,
+        )
 
     def get_context_string(self, cwe_id: str, code_snippet: str = "") -> str:
         docs = self.query(cwe_id, code_snippet, n_results=4)
@@ -144,6 +144,114 @@ class ChromaRetriever:
             self._last_error = str(exc)
             self._ready = False
             self._collection = None
+
+    def _query_collection(
+        self,
+        query_text: str,
+        n_results: int,
+        where: dict | None,
+        default_cwe: str,
+    ) -> list[dict]:
+        try:
+            raw = self._collection.query(
+                query_texts=[query_text],
+                n_results=min(n_results, max(1, self._collection.count())),
+                where=where,
+                include=["documents", "metadatas"],
+            )
+            docs = raw.get("documents", [[]])[0]
+            metas = raw.get("metadatas", [[]])[0]
+        except Exception:
+            return []
+
+        return self._parse_raw(docs, metas, default_cwe)
+
+    @staticmethod
+    def _build_query_text(cwe_id: str, code_snippet: str) -> str:
+        search_hints = {
+            "CWE-22": "path traversal file inclusion",
+            "CWE-78": "command injection os command",
+            "CWE-79": "cross site scripting xss",
+            "CWE-89": "sql injection parameterized query",
+            "CWE-94": "code injection eval exec",
+            "CWE-327": "weak cryptography insecure algorithm",
+            "CWE-330": "weak randomness predictable value",
+            "CWE-434": "unrestricted file upload",
+            "CWE-502": "deserialization unsafe object",
+            "CWE-798": "hardcoded credential secret password",
+            "CWE-829": "dependency package supply chain vulnerable library",
+        }
+        hint = search_hints.get(cwe_id, "")
+        return " ".join(part for part in [cwe_id, hint, code_snippet[:300]] if part).strip()
+
+    @classmethod
+    def _merge_ranked_results(
+        cls,
+        exact_docs: list[dict],
+        broad_docs: list[dict],
+        cwe_id: str,
+        n_results: int,
+    ) -> list[dict]:
+        source_priority = cls._source_priority(cwe_id)
+        merged: list[dict] = []
+        seen: set[tuple[str, str, str]] = set()
+
+        for doc in exact_docs + broad_docs:
+            key = (
+                doc.get("source", ""),
+                doc.get("source_id", "") or doc.get("kisa_article", "") or doc.get("title", "") or doc.get("cve_id", ""),
+                doc.get("text", "")[:120],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(doc)
+
+        merged.sort(key=lambda doc: cls._doc_rank(doc, cwe_id, source_priority))
+        return merged[:n_results]
+
+    @staticmethod
+    def _source_priority(cwe_id: str) -> dict[str, int]:
+        if cwe_id == "CWE-829":
+            return {
+                "NVD": 0,
+                "FSI": 1,
+                "KISA": 2,
+                "OWASP": 3,
+            }
+        return {
+            "KISA": 0,
+            "FSI": 1,
+            "OWASP": 2,
+            "NVD": 3,
+        }
+
+    @staticmethod
+    def _doc_rank(doc: dict, cwe_id: str, source_priority: dict[str, int]) -> tuple[int, int, int, int, int]:
+        source = doc.get("source") or ""
+        doc_cwe = doc.get("cwe") or ""
+        identifier = (
+            doc.get("kisa_article")
+            or doc.get("source_id")
+            or doc.get("owasp_id")
+            or doc.get("cve_id")
+            or doc.get("title")
+            or ""
+        )
+
+        exact_cwe_rank = 0 if cwe_id and doc_cwe == cwe_id else 1
+        source_rank = source_priority.get(source, 99)
+        missing_cwe_rank = 1 if not doc_cwe else 0
+        missing_identifier_rank = 1 if not identifier else 0
+        source_penalty = 1 if source == "NVD" and cwe_id != "CWE-829" else 0
+
+        return (
+            source_rank,
+            exact_cwe_rank,
+            source_penalty,
+            missing_cwe_rank,
+            missing_identifier_rank,
+        )
 
     @staticmethod
     def _parse_raw(docs: list[str], metas: list[dict], default_cwe: str) -> list[dict]:
