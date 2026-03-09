@@ -21,6 +21,7 @@ class ClaudeAnalyzer(BaseAnalyzer):
         self.api_key = api_key
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = "claude-3-5-sonnet-20241022"
+        self.last_error: str | None = None
 
     def analyze(self, 
                 scan_result: ScanResult, 
@@ -40,7 +41,8 @@ class ClaudeAnalyzer(BaseAnalyzer):
         if not scan_result.findings:
             return []
 
-        prompt = self._build_prompt(scan_result, knowledge, fix_hints)
+        self.last_error = None
+        prompt, finding_context = self._build_prompt(scan_result, knowledge, fix_hints)
         
         try:
             message = self.client.messages.create(
@@ -51,6 +53,9 @@ class ClaudeAnalyzer(BaseAnalyzer):
                     {"role": "user", "content": prompt}
                 ]
             )
+
+            if not message.content or not message.content[0].text:
+                raise ValueError("Claude API returned an empty response.")
             
             response_text = message.content[0].text
             raw_data = self._parse_response(response_text)
@@ -58,10 +63,19 @@ class ClaudeAnalyzer(BaseAnalyzer):
             suggestions = []
             for item in raw_data:
                 if item.get("is_real_threat") is True:
-                    issue_id = f"{scan_result.file_path}_{item.get('cwe_id')}_{item.get('line_number')}"
+                    context = finding_context.get(item.get("finding_id"), {})
+                    file_path = item.get("file_path") or context.get("file_path") or scan_result.file_path
+                    cwe_id = item.get("cwe_id") or context.get("cwe_id")
+                    line_number = item.get("line_number") or context.get("line_number")
+                    issue_id = self._build_issue_id(file_path, cwe_id, line_number)
                     
                     suggestion = FixSuggestion(
                         issue_id=issue_id,
+                        file_path=file_path,
+                        cwe_id=cwe_id,
+                        line_number=line_number,
+                        reachability=item.get("reachability"),
+                        kisa_reference=item.get("kisa_reference"),
                         original_code=item.get("original_code", ""),
                         fixed_code=item.get("fixed_code", ""),
                         description=item.get("description", "")
@@ -71,13 +85,14 @@ class ClaudeAnalyzer(BaseAnalyzer):
             return suggestions
 
         except Exception as e:
+            self.last_error = str(e)
             print(f"[ERROR] Claude API Call Error: {e}")
             return []
 
     def _build_prompt(self, 
                       scan_result: ScanResult, 
                       knowledge: List[Dict], 
-                      fix_hints: List[Dict]) -> str:
+                      fix_hints: List[Dict]) -> tuple[str, Dict[str, Dict]]:
         """
         Claude에게 보낼 유저 프롬프트를 생성합니다.
         """
@@ -86,16 +101,30 @@ class ClaudeAnalyzer(BaseAnalyzer):
             f"Language: {scan_result.language}",
             "\nDetected potential vulnerabilities:",
         ]
+        finding_context: Dict[str, Dict] = {}
 
         knowledge_map = {item.get("id"): item for item in knowledge}
         fix_map = {item.get("id"): item for item in fix_hints}
 
-        for f in scan_result.findings:
+        for index, f in enumerate(scan_result.findings, start=1):
+            finding_id = f"finding-{index}"
+            finding_file_path = f.file_path or scan_result.file_path
             cwe_id = f.cwe_id
             k_info = knowledge_map.get(cwe_id, {}).get("description", "No knowledge available")
-            h_info = fix_map.get(cwe_id, {}).get("fixed_code", "No fix hint available")
+            h_info = (
+                fix_map.get(cwe_id, {}).get("safe")
+                or fix_map.get(cwe_id, {}).get("fixed_code")
+                or "No fix hint available"
+            )
+            finding_context[finding_id] = {
+                "file_path": finding_file_path,
+                "cwe_id": cwe_id,
+                "line_number": f.line_number,
+            }
 
             prompt_lines.append(f"---")
+            prompt_lines.append(f"Finding ID: {finding_id}")
+            prompt_lines.append(f"File Path: {finding_file_path}")
             prompt_lines.append(f"CWE_ID: {cwe_id}")
             prompt_lines.append(f"Line: {f.line_number}")
             prompt_lines.append(f"Severity: {f.severity}")
@@ -104,9 +133,9 @@ class ClaudeAnalyzer(BaseAnalyzer):
             prompt_lines.append(f"Fix Example: {h_info}")
 
         prompt_lines.append("\nRespond ONLY with a JSON array of objects with the following structure:")
-        prompt_lines.append('[{"cwe_id": "string", "line_number": int, "is_real_threat": boolean, "reachability": "string", "kisa_reference": "string", "original_code": "string", "fixed_code": "string", "description": "string"}]')
+        prompt_lines.append('[{"finding_id": "string", "file_path": "string", "cwe_id": "string", "line_number": int, "is_real_threat": boolean, "reachability": "string", "kisa_reference": "string", "original_code": "string", "fixed_code": "string", "description": "string"}]')
 
-        return "\n".join(prompt_lines)
+        return "\n".join(prompt_lines), finding_context
 
     def _parse_response(self, response_text: str) -> List[Dict]:
         """
@@ -114,7 +143,16 @@ class ClaudeAnalyzer(BaseAnalyzer):
         """
         try:
             clean_text = re.sub(r'```(?:json)?\s*(.*?)\s*```', r'\1', response_text, flags=re.DOTALL).strip()
-            return json.loads(clean_text)
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"[ERROR] JSON Parsing Error: {e}")
-            return []
+            parsed = json.loads(clean_text)
+            if not isinstance(parsed, list):
+                raise ValueError("Claude response must be a JSON array.")
+            return parsed
+        except (json.JSONDecodeError, ValueError) as e:
+            raise ValueError(f"Claude JSON parsing failed: {e}") from e
+
+    @staticmethod
+    def _build_issue_id(file_path: str | None, cwe_id: str | None, line_number: int | None) -> str:
+        normalized_file_path = file_path or "unknown-file"
+        normalized_cwe_id = cwe_id or "UNKNOWN"
+        normalized_line_number = line_number if line_number is not None else "unknown"
+        return f"{normalized_file_path}_{normalized_cwe_id}_{normalized_line_number}"
