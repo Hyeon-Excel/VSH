@@ -1,7 +1,6 @@
 from .base_module import BaseScanner, BaseAnalyzer
 from .scanner.mock_semgrep_scanner import MockSemgrepScanner as SemgrepScanner
 from .scanner.sbom_scanner import SBOMScanner
-from .analyzer.analyzer_factory import AnalyzerFactory
 
 __all__ = [
     "BaseScanner",
@@ -10,6 +9,8 @@ __all__ = [
     "TreeSitterScanner",
     "SBOMScanner",
     "EvidenceRetriever",
+    "RegistryVerifier",
+    "OsvVerifier",
     "ClaudeAnalyzer",
     "GeminiAnalyzer",
     "MockAnalyzer",
@@ -23,19 +24,31 @@ def __getattr__(name: str):
 
         return TreeSitterScanner
     if name == "EvidenceRetriever":
-        from .retriever import EvidenceRetriever
+        from layer2.retriever import EvidenceRetriever
 
         return EvidenceRetriever
+    if name == "RegistryVerifier":
+        from layer2.verifier import RegistryVerifier
+
+        return RegistryVerifier
+    if name == "OsvVerifier":
+        from layer2.verifier import OsvVerifier
+
+        return OsvVerifier
     if name == "ClaudeAnalyzer":
-        from .analyzer import ClaudeAnalyzer
+        from layer2.analyzer import ClaudeAnalyzer
 
         return ClaudeAnalyzer
     if name == "GeminiAnalyzer":
-        from .analyzer import GeminiAnalyzer
+        from layer2.analyzer import GeminiAnalyzer
 
         return GeminiAnalyzer
     if name == "MockAnalyzer":
-        from .analyzer import MockAnalyzer
+        from layer2.analyzer import MockAnalyzer
 
         return MockAnalyzer
+    if name == "AnalyzerFactory":
+        from layer2.analyzer import AnalyzerFactory
+
+        return AnalyzerFactory
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

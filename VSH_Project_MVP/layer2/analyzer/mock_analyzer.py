@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from ..base_module import BaseAnalyzer
+from modules.base_module import BaseAnalyzer
 from models.fix_suggestion import FixSuggestion
 from models.scan_result import ScanResult
 

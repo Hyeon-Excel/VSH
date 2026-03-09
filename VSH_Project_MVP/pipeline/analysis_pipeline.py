@@ -1,8 +1,10 @@
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 from .base_pipeline import BasePipeline
 from modules.base_module import BaseScanner, BaseAnalyzer
-from modules.retriever.evidence_retriever import EvidenceRetriever
+from layer2.retriever.evidence_retriever import EvidenceRetriever
+from layer2.verifier.registry_verifier import RegistryVerifier
+from layer2.verifier.osv_verifier import OsvVerifier
 from repository.base_repository import BaseReadRepository, BaseWriteRepository
 from models.vulnerability import Vulnerability
 from models.scan_result import ScanResult
@@ -19,10 +21,14 @@ class AnalysisPipeline(BasePipeline):
                  knowledge_repo: BaseReadRepository,
                  fix_repo: BaseReadRepository,
                  log_repo: BaseWriteRepository,
-                 evidence_retriever: EvidenceRetriever | None = None):
+                 evidence_retriever: EvidenceRetriever | None = None,
+                 registry_verifier: RegistryVerifier | None = None,
+                 osv_verifier: OsvVerifier | None = None):
         self.scanners = scanners
         self.analyzer = analyzer
         self.evidence_retriever = evidence_retriever or EvidenceRetriever()
+        self.registry_verifier = registry_verifier or RegistryVerifier()
+        self.osv_verifier = osv_verifier or OsvVerifier()
         self.knowledge_repo = knowledge_repo
         self.fix_repo = fix_repo
         self.log_repo = log_repo
@@ -77,6 +83,10 @@ class AnalysisPipeline(BasePipeline):
                 knowledge_data,
                 fix_data,
             )
+            verification_map = self._build_verification_map(
+                default_file_path=file_path,
+                findings=unique_findings,
+            )
 
             # 6. Analyzer 실행 (L2)
             fix_suggestions = self.analyzer.analyze(
@@ -91,11 +101,13 @@ class AnalysisPipeline(BasePipeline):
             if analysis_error:
                 for finding in unique_findings:
                     evidence_context = self._build_evidence_context(file_path, finding, evidence_map)
+                    verification_context = self._build_verification_context(file_path, finding, verification_map)
                     self.log_repo.save(
                         self._build_analysis_failure_log(
                             default_file_path=file_path,
                             finding=finding,
                             evidence_context=evidence_context,
+                            verification_context=verification_context,
                             error_message=analysis_error,
                         )
                     )
@@ -110,6 +122,11 @@ class AnalysisPipeline(BasePipeline):
                     if matching_vuln:
                         finding_file_path = self._resolve_finding_file_path(matching_vuln, file_path)
                         evidence_context = self._build_evidence_context(file_path, matching_vuln, evidence_map)
+                        verification_context = self._build_verification_context(
+                            file_path,
+                            matching_vuln,
+                            verification_map,
+                        )
                         canonical_issue_id = self._build_issue_id(
                             finding_file_path,
                             matching_vuln.cwe_id,
@@ -124,6 +141,14 @@ class AnalysisPipeline(BasePipeline):
                                 "evidence_refs": suggestion.evidence_refs or evidence_context.get("evidence_refs", []),
                                 "evidence_summary": suggestion.evidence_summary or evidence_context.get("evidence_summary"),
                                 "kisa_reference": suggestion.kisa_reference or evidence_context.get("primary_reference"),
+                                "registry_status": suggestion.registry_status or verification_context.get("registry_status"),
+                                "registry_summary": suggestion.registry_summary or verification_context.get("registry_summary"),
+                                "osv_status": suggestion.osv_status or verification_context.get("osv_status"),
+                                "osv_summary": suggestion.osv_summary or verification_context.get("osv_summary"),
+                                "verification_summary": (
+                                    suggestion.verification_summary
+                                    or verification_context.get("verification_summary")
+                                ),
                             }
                         )
                         log_data = {
@@ -140,6 +165,11 @@ class AnalysisPipeline(BasePipeline):
                             "kisa_reference": normalized_suggestion.kisa_reference,
                             "evidence_refs": normalized_suggestion.evidence_refs,
                             "evidence_summary": normalized_suggestion.evidence_summary,
+                            "registry_status": normalized_suggestion.registry_status,
+                            "registry_summary": normalized_suggestion.registry_summary,
+                            "osv_status": normalized_suggestion.osv_status,
+                            "osv_summary": normalized_suggestion.osv_summary,
+                            "verification_summary": normalized_suggestion.verification_summary,
                             "status": "pending"
                         }
                         suggestion.issue_id = normalized_suggestion.issue_id
@@ -149,6 +179,11 @@ class AnalysisPipeline(BasePipeline):
                         suggestion.evidence_refs = normalized_suggestion.evidence_refs
                         suggestion.evidence_summary = normalized_suggestion.evidence_summary
                         suggestion.kisa_reference = normalized_suggestion.kisa_reference
+                        suggestion.registry_status = normalized_suggestion.registry_status
+                        suggestion.registry_summary = normalized_suggestion.registry_summary
+                        suggestion.osv_status = normalized_suggestion.osv_status
+                        suggestion.osv_summary = normalized_suggestion.osv_summary
+                        suggestion.verification_summary = normalized_suggestion.verification_summary
                         self.log_repo.save(log_data)
 
         # 8. 결과 dict로 변환 (Pydantic model_dump 사용)
@@ -241,6 +276,7 @@ class AnalysisPipeline(BasePipeline):
         default_file_path: str,
         finding: Vulnerability,
         evidence_context: dict,
+        verification_context: dict,
         error_message: str,
     ) -> dict:
         finding_file_path = cls._resolve_finding_file_path(finding, default_file_path)
@@ -258,6 +294,11 @@ class AnalysisPipeline(BasePipeline):
             "kisa_reference": evidence_context.get("primary_reference"),
             "evidence_refs": evidence_context.get("evidence_refs", []),
             "evidence_summary": evidence_context.get("evidence_summary"),
+            "registry_status": verification_context.get("registry_status"),
+            "registry_summary": verification_context.get("registry_summary"),
+            "osv_status": verification_context.get("osv_status"),
+            "osv_summary": verification_context.get("osv_summary"),
+            "verification_summary": verification_context.get("verification_summary"),
             "analysis_error": error_message,
             "status": "analysis_failed",
         }
@@ -275,3 +316,72 @@ class AnalysisPipeline(BasePipeline):
             finding.line_number,
         )
         return evidence_map.get(issue_id, {})
+
+    @classmethod
+    def _build_verification_context(
+        cls,
+        default_file_path: str,
+        finding: Vulnerability,
+        verification_map: dict,
+    ) -> dict:
+        issue_id = cls._build_issue_id(
+            cls._resolve_finding_file_path(finding, default_file_path),
+            finding.cwe_id,
+            finding.line_number,
+        )
+        return verification_map.get(issue_id, {})
+
+    def _build_verification_map(
+        self,
+        default_file_path: str,
+        findings: List[Vulnerability],
+    ) -> Dict[str, Dict]:
+        verification_map: Dict[str, Dict] = {}
+
+        for finding in findings:
+            issue_id = self._build_issue_id(
+                self._resolve_finding_file_path(finding, default_file_path),
+                finding.cwe_id,
+                finding.line_number,
+            )
+
+            registry_context = self._safe_verify(self.registry_verifier, finding, "registry")
+            osv_context = self._safe_verify(self.osv_verifier, finding, "osv")
+            verification_context = {
+                **registry_context,
+                **osv_context,
+            }
+
+            summary = self._compose_verification_summary(verification_context)
+            if summary:
+                verification_context["verification_summary"] = summary
+
+            if verification_context:
+                verification_map[issue_id] = verification_context
+
+        return verification_map
+
+    @staticmethod
+    def _safe_verify(verifier, finding: Vulnerability, prefix: str) -> Dict[str, str | None]:
+        try:
+            return verifier.verify(finding)
+        except Exception as exc:
+            return {
+                f"{prefix}_status": "ERROR",
+                f"{prefix}_summary": str(exc),
+            }
+
+    @staticmethod
+    def _compose_verification_summary(verification_context: Dict[str, str | None]) -> str | None:
+        parts = []
+        registry_status = verification_context.get("registry_status")
+        registry_summary = verification_context.get("registry_summary")
+        osv_status = verification_context.get("osv_status")
+        osv_summary = verification_context.get("osv_summary")
+
+        if registry_status:
+            parts.append(f"Registry[{registry_status}] {registry_summary or ''}".strip())
+        if osv_status:
+            parts.append(f"OSV[{osv_status}] {osv_summary or ''}".strip())
+
+        return " | ".join(parts) if parts else None

@@ -46,6 +46,11 @@
 | `kisa_reference` | `str \| None` | 관련 KISA 또는 보안 기준 참조 |
 | `evidence_refs` | `list[str]` | retrieval이 모은 근거 참조 목록 |
 | `evidence_summary` | `str \| None` | retrieval이 정리한 근거 요약 |
+| `registry_status` | `str \| None` | registry verifier 결과 상태 |
+| `registry_summary` | `str \| None` | registry verifier 상세 설명 |
+| `osv_status` | `str \| None` | OSV verifier 결과 상태 |
+| `osv_summary` | `str \| None` | OSV verifier 상세 설명 |
+| `verification_summary` | `str \| None` | verifier 결과를 합친 요약 |
 | `original_code` | `str` | 수정 전 원본 코드 |
 | `fixed_code` | `str` | 수정 후 제안 코드 |
 | `description` | `str` | 수정 내용에 대한 설명 |
@@ -114,6 +119,21 @@ AST(Abstract Syntax Tree) 구문 분석 기반 스캐너입니다.
 
 ---
 
+## Verification Layer (layer2/verifier/)
+
+### RegistryVerifier
+공급망 finding에서 패키지 선언을 식별하고 registry 검증 대상 여부를 정규화합니다.
+- **Method**: `verify(finding: Vulnerability) -> dict`
+- **Status Values**: `FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`
+
+### OsvVerifier
+공급망 finding에 대해 advisory 기반 취약 버전 여부를 정규화합니다.
+- **Method**: `verify(finding: Vulnerability) -> dict`
+- **Current Data Source**: `config.VULNERABLE_PACKAGES` 기반 deterministic verifier
+- **Status Values**: `FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`
+
+---
+
 ## Pipeline Layer (pipeline/)
 
 ### BasePipeline (Abstract)
@@ -123,7 +143,7 @@ AST(Abstract Syntax Tree) 구문 분석 기반 스캐너입니다.
 ### AnalysisPipeline
 실제 분석 흐름을 오케스트레이션하는 클래스입니다. 생성자를 통해 스캐너, 분석기, 레포지토리(Read/Write)를 주입받습니다.
 - **Method**: `run(file_path: str) -> dict`
-  - **전체 흐름**: 스캐너 실행 -> 중복 제거 -> Analyzer 실행 -> **결과를 `LogRepo`에 영구 저장(original/fixed code 포함)** -> 결과 반환.
+  - **전체 흐름**: 스캐너 실행 -> 중복 제거 -> Retrieval -> Analyzer 실행 -> Verification 정규화 -> **결과를 `LogRepo`에 영구 저장(original/fixed code 포함)** -> 결과 반환.
 
 ---
 

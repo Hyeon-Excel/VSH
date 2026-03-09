@@ -64,6 +64,12 @@ def test_e2e_scan_vulnerable_file(pipeline):
         assert suggestion.get("evidence_refs"), "evidence_refs가 비어있습니다."
         assert suggestion.get("evidence_summary"), "evidence_summary가 비어있습니다."
 
+    supply_chain = next((s for s in result["fix_suggestions"] if s["cwe_id"] == "CWE-829"), None)
+    assert supply_chain is not None, "CWE-829 공급망 finding이 누락되었습니다."
+    assert supply_chain["registry_status"] == "FOUND"
+    assert supply_chain["osv_status"] == "FOUND"
+    assert supply_chain.get("verification_summary"), "verification_summary가 비어있습니다."
+
 @requires_server
 def test_e2e_dashboard_api(pipeline):
     """시나리오 2 — Dashboard API 검증"""
@@ -82,6 +88,9 @@ def test_e2e_dashboard_api(pipeline):
         assert "fixed_code" in log
         assert "evidence_refs" in log
         assert "evidence_summary" in log
+        assert "registry_status" in log
+        assert "osv_status" in log
+        assert "verification_summary" in log
         
     # 3. pending 항목 추출
     pending_logs = [l for l in data["logs"] if l["status"] == "pending"]
@@ -126,7 +135,10 @@ def test_e2e_log_history(pipeline):
         "issue_id", "file_path", "cwe_id", 
         "severity", "line_number", "code_snippet",
         "original_code", "fixed_code", "status",
-        "evidence_refs", "evidence_summary"
+        "evidence_refs", "evidence_summary",
+        "registry_status", "registry_summary",
+        "osv_status", "osv_summary",
+        "verification_summary",
     ]
     
     for log in logs:
