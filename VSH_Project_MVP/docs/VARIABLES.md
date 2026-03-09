@@ -34,6 +34,8 @@
 - `description`: L2가 생성한 수정 설명
 - `reachability`: L2가 판단한 실제 위협 도달 가능성 설명
 - `kisa_reference`: 연관된 KISA 또는 보안 기준 참조
+- `evidence_refs`: retrieval이 수집한 근거 참조 목록
+- `evidence_summary`: retrieval이 정리한 근거 요약
 - `analysis_error`: L2 분석 실패 시 저장되는 오류 메시지
 
 ### Status Allowed Values

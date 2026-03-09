@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 from .base_pipeline import BasePipeline
 from modules.base_module import BaseScanner, BaseAnalyzer
+from modules.retriever.evidence_retriever import EvidenceRetriever
 from repository.base_repository import BaseReadRepository, BaseWriteRepository
 from models.vulnerability import Vulnerability
 from models.scan_result import ScanResult
@@ -17,9 +18,11 @@ class AnalysisPipeline(BasePipeline):
                  analyzer: BaseAnalyzer,
                  knowledge_repo: BaseReadRepository,
                  fix_repo: BaseReadRepository,
-                 log_repo: BaseWriteRepository):
+                 log_repo: BaseWriteRepository,
+                 evidence_retriever: EvidenceRetriever | None = None):
         self.scanners = scanners
         self.analyzer = analyzer
+        self.evidence_retriever = evidence_retriever or EvidenceRetriever()
         self.knowledge_repo = knowledge_repo
         self.fix_repo = fix_repo
         self.log_repo = log_repo
@@ -69,22 +72,30 @@ class AnalysisPipeline(BasePipeline):
             # 5. Repository에서 데이터 조회
             knowledge_data = self.knowledge_repo.find_all()
             fix_data = self.fix_repo.find_all()
+            evidence_map = self.evidence_retriever.retrieve(
+                integrated_scan_result,
+                knowledge_data,
+                fix_data,
+            )
 
             # 6. Analyzer 실행 (L2)
             fix_suggestions = self.analyzer.analyze(
                 integrated_scan_result,
                 knowledge_data,
-                fix_data
+                fix_data,
+                evidence_map,
             )
             analysis_error = getattr(self.analyzer, "last_error", None)
 
             # 7. LogRepo 저장
             if analysis_error:
                 for finding in unique_findings:
+                    evidence_context = self._build_evidence_context(file_path, finding, evidence_map)
                     self.log_repo.save(
                         self._build_analysis_failure_log(
                             default_file_path=file_path,
                             finding=finding,
+                            evidence_context=evidence_context,
                             error_message=analysis_error,
                         )
                     )
@@ -98,6 +109,7 @@ class AnalysisPipeline(BasePipeline):
                     
                     if matching_vuln:
                         finding_file_path = self._resolve_finding_file_path(matching_vuln, file_path)
+                        evidence_context = self._build_evidence_context(file_path, matching_vuln, evidence_map)
                         canonical_issue_id = self._build_issue_id(
                             finding_file_path,
                             matching_vuln.cwe_id,
@@ -109,6 +121,9 @@ class AnalysisPipeline(BasePipeline):
                                 "file_path": finding_file_path,
                                 "cwe_id": matching_vuln.cwe_id,
                                 "line_number": matching_vuln.line_number,
+                                "evidence_refs": suggestion.evidence_refs or evidence_context.get("evidence_refs", []),
+                                "evidence_summary": suggestion.evidence_summary or evidence_context.get("evidence_summary"),
+                                "kisa_reference": suggestion.kisa_reference or evidence_context.get("primary_reference"),
                             }
                         )
                         log_data = {
@@ -123,12 +138,17 @@ class AnalysisPipeline(BasePipeline):
                             "description": normalized_suggestion.description,
                             "reachability": normalized_suggestion.reachability,
                             "kisa_reference": normalized_suggestion.kisa_reference,
+                            "evidence_refs": normalized_suggestion.evidence_refs,
+                            "evidence_summary": normalized_suggestion.evidence_summary,
                             "status": "pending"
                         }
                         suggestion.issue_id = normalized_suggestion.issue_id
                         suggestion.file_path = normalized_suggestion.file_path
                         suggestion.cwe_id = normalized_suggestion.cwe_id
                         suggestion.line_number = normalized_suggestion.line_number
+                        suggestion.evidence_refs = normalized_suggestion.evidence_refs
+                        suggestion.evidence_summary = normalized_suggestion.evidence_summary
+                        suggestion.kisa_reference = normalized_suggestion.kisa_reference
                         self.log_repo.save(log_data)
 
         # 8. 결과 dict로 변환 (Pydantic model_dump 사용)
@@ -220,6 +240,7 @@ class AnalysisPipeline(BasePipeline):
         cls,
         default_file_path: str,
         finding: Vulnerability,
+        evidence_context: dict,
         error_message: str,
     ) -> dict:
         finding_file_path = cls._resolve_finding_file_path(finding, default_file_path)
@@ -234,7 +255,23 @@ class AnalysisPipeline(BasePipeline):
             "fixed_code": "",
             "description": "L2 분석 실패로 수정 제안을 생성하지 못했습니다.",
             "reachability": None,
-            "kisa_reference": None,
+            "kisa_reference": evidence_context.get("primary_reference"),
+            "evidence_refs": evidence_context.get("evidence_refs", []),
+            "evidence_summary": evidence_context.get("evidence_summary"),
             "analysis_error": error_message,
             "status": "analysis_failed",
         }
+
+    @classmethod
+    def _build_evidence_context(
+        cls,
+        default_file_path: str,
+        finding: Vulnerability,
+        evidence_map: dict,
+    ) -> dict:
+        issue_id = cls._build_issue_id(
+            cls._resolve_finding_file_path(finding, default_file_path),
+            finding.cwe_id,
+            finding.line_number,
+        )
+        return evidence_map.get(issue_id, {})

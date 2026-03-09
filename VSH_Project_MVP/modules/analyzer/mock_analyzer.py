@@ -26,17 +26,21 @@ class MockAnalyzer(BaseAnalyzer):
         scan_result: ScanResult,
         knowledge: List[Dict],
         fix_hints: List[Dict],
+        evidence_map: Dict[str, Dict] | None = None,
     ) -> List[FixSuggestion]:
         self.last_error = None
         if not scan_result.findings:
             return []
 
+        evidence_map = evidence_map or {}
         knowledge_map = {item.get("id"): item for item in knowledge}
         fix_map = {item.get("id"): item for item in fix_hints}
         suggestions: List[FixSuggestion] = []
 
         for finding in scan_result.findings:
             file_path = finding.file_path or scan_result.file_path
+            issue_id = self._build_issue_id(file_path, finding.cwe_id, finding.line_number)
+            evidence_context = evidence_map.get(issue_id, {})
             fix_hint = fix_map.get(finding.cwe_id, {})
             knowledge_entry = knowledge_map.get(finding.cwe_id, {})
             fixed_code, description, reference = self._resolve_fix(
@@ -45,18 +49,35 @@ class MockAnalyzer(BaseAnalyzer):
                 fix_hint,
                 knowledge_entry,
             )
+            primary_reference = (
+                evidence_context.get("primary_reference")
+                or reference
+                or knowledge_entry.get("reference")
+            )
+            evidence_refs = evidence_context.get("evidence_refs") or []
+            if primary_reference and primary_reference not in evidence_refs:
+                evidence_refs = [*evidence_refs, primary_reference]
+            evidence_summary = evidence_context.get("evidence_summary")
+            if not evidence_summary:
+                evidence_summary = self._build_evidence_summary(
+                    finding.cwe_id,
+                    file_path,
+                    knowledge_entry,
+                )
 
             suggestions.append(
                 FixSuggestion(
-                    issue_id=self._build_issue_id(file_path, finding.cwe_id, finding.line_number),
+                    issue_id=issue_id,
                     file_path=file_path,
                     cwe_id=finding.cwe_id,
                     line_number=finding.line_number,
                     reachability=self._build_reachability(finding.cwe_id, file_path),
-                    kisa_reference=reference or knowledge_entry.get("reference"),
+                    kisa_reference=primary_reference,
+                    evidence_refs=evidence_refs,
+                    evidence_summary=evidence_summary,
                     original_code=finding.code_snippet,
-                    fixed_code=fixed_code,
-                    description=description,
+                    fixed_code=evidence_context.get("recommended_fix") or fixed_code,
+                    description=evidence_context.get("remediation_summary") or description,
                 )
             )
 
@@ -114,6 +135,14 @@ class MockAnalyzer(BaseAnalyzer):
         if cwe_id == "CWE-829":
             return f"{file_name}에 취약 버전 의존성이 직접 선언되어 있어 즉시 수정 대상입니다."
         return f"{file_name}에서 탐지 규칙과 일치하는 위험 코드가 직접 발견되었습니다."
+
+    @staticmethod
+    def _build_evidence_summary(cwe_id: str, file_path: str, knowledge_entry: Dict) -> str:
+        file_name = Path(file_path).name
+        description = knowledge_entry.get("description")
+        if description:
+            return f"{file_name}에서 `{cwe_id}` 관련 위험 코드가 탐지되었습니다. {description}."
+        return f"{file_name}에서 `{cwe_id}` 관련 위험 코드가 탐지되었습니다."
 
     @staticmethod
     def _build_issue_id(file_path: str, cwe_id: str, line_number: int) -> str:

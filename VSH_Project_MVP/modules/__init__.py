@@ -9,6 +9,7 @@ __all__ = [
     "SemgrepScanner",
     "TreeSitterScanner",
     "SBOMScanner",
+    "EvidenceRetriever",
     "ClaudeAnalyzer",
     "GeminiAnalyzer",
     "MockAnalyzer",
@@ -21,6 +22,10 @@ def __getattr__(name: str):
         from .scanner import TreeSitterScanner
 
         return TreeSitterScanner
+    if name == "EvidenceRetriever":
+        from .retriever import EvidenceRetriever
+
+        return EvidenceRetriever
     if name == "ClaudeAnalyzer":
         from .analyzer import ClaudeAnalyzer
 

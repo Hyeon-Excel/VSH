@@ -44,6 +44,8 @@
 | `line_number` | `int \| None` | 연관된 라인 번호 |
 | `reachability` | `str \| None` | 실제 위협 도달 가능성 판단 |
 | `kisa_reference` | `str \| None` | 관련 KISA 또는 보안 기준 참조 |
+| `evidence_refs` | `list[str]` | retrieval이 모은 근거 참조 목록 |
+| `evidence_summary` | `str \| None` | retrieval이 정리한 근거 요약 |
 | `original_code` | `str` | 수정 전 원본 코드 |
 | `fixed_code` | `str` | 수정 후 제안 코드 |
 | `description` | `str` | 수정 내용에 대한 설명 |

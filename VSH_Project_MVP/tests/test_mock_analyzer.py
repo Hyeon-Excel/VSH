@@ -4,6 +4,7 @@ from models.vulnerability import Vulnerability
 from repository.fix_repo import MockFixRepo
 from repository.knowledge_repo import MockKnowledgeRepo
 from pipeline.pipeline_factory import PipelineFactory
+from modules.retriever.evidence_retriever import EvidenceRetriever
 
 
 def test_mock_analyzer_uses_fix_repo_templates():
@@ -30,6 +31,7 @@ def test_mock_analyzer_uses_fix_repo_templates():
     assert suggestions[0].fixed_code == "cursor.execute('SELECT * FROM users WHERE id = %s', (user_input,))"
     assert suggestions[0].kisa_reference == "KISA 시큐어코딩 DB-01"
     assert suggestions[0].issue_id == "tests/e2e_target.py_CWE-89_5"
+    assert "KISA 시큐어코딩 DB-01" in suggestions[0].evidence_refs
 
 
 def test_mock_analyzer_builds_dependency_upgrade_suggestion():
@@ -48,12 +50,14 @@ def test_mock_analyzer_builds_dependency_upgrade_suggestion():
         ],
     )
 
-    suggestions = analyzer.analyze(scan_result, knowledge=[], fix_hints=[])
+    evidence_map = EvidenceRetriever().retrieve(scan_result, knowledge=[], fix_hints=[])
+    suggestions = analyzer.analyze(scan_result, knowledge=[], fix_hints=[], evidence_map=evidence_map)
 
     assert len(suggestions) == 1
     assert suggestions[0].fixed_code == "requests>=2.20.0"
     assert "CVE-2018-18074" in (suggestions[0].kisa_reference or "")
     assert suggestions[0].file_path == "requirements.txt"
+    assert "Safe floor: 2.20.0" in suggestions[0].evidence_refs
 
 
 def test_pipeline_factory_supports_mock_provider(monkeypatch):

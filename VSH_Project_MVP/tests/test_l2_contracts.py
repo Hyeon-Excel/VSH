@@ -19,7 +19,7 @@ class DummyAnalyzer:
         self.suggestion = suggestion
         self.last_error = None
 
-    def analyze(self, scan_result, knowledge, fix_hints):
+    def analyze(self, scan_result, knowledge, fix_hints, evidence_map=None):
         return [self.suggestion]
 
 
@@ -27,7 +27,7 @@ class FailingAnalyzer:
     def __init__(self, error_message: str):
         self.last_error = error_message
 
-    def analyze(self, scan_result, knowledge, fix_hints):
+    def analyze(self, scan_result, knowledge, fix_hints, evidence_map=None):
         return []
 
 
@@ -71,6 +71,8 @@ def test_fix_suggestion_preserves_l2_metadata():
     assert payload["line_number"] == 7
     assert payload["reachability"] == "User-controlled input reaches the query."
     assert payload["kisa_reference"] == "KISA DB-01"
+    assert payload["evidence_refs"] == []
+    assert payload["evidence_summary"] is None
 
 
 def test_pipeline_package_exports_factory_without_optional_import_masking():
@@ -97,6 +99,8 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
         line_number=7,
         reachability="User input is directly reachable from the sink.",
         kisa_reference="KISA DB-01",
+        evidence_refs=["CWE-89", "KISA 시큐어코딩 DB-01"],
+        evidence_summary="sample.py에서 SQL Injection 패턴이 확인되었습니다.",
         original_code="cursor.execute(query % user_input)",
         fixed_code="cursor.execute(query, (user_input,))",
         description="Use parameter binding instead of string interpolation.",
@@ -118,12 +122,16 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["fix_suggestions"][0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
     assert result["fix_suggestions"][0]["reachability"] == "User input is directly reachable from the sink."
     assert result["fix_suggestions"][0]["kisa_reference"] == "KISA DB-01"
+    assert result["fix_suggestions"][0]["evidence_refs"] == ["CWE-89", "KISA 시큐어코딩 DB-01"]
+    assert result["fix_suggestions"][0]["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
     assert len(log_repo.saved) == 1
     assert log_repo.saved[0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
     assert log_repo.saved[0]["file_path"] == str(vulnerable_file)
     assert log_repo.saved[0]["description"] == "Use parameter binding instead of string interpolation."
     assert log_repo.saved[0]["reachability"] == "User input is directly reachable from the sink."
     assert log_repo.saved[0]["kisa_reference"] == "KISA DB-01"
+    assert log_repo.saved[0]["evidence_refs"] == ["CWE-89", "KISA 시큐어코딩 DB-01"]
+    assert log_repo.saved[0]["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
 
 
 def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
