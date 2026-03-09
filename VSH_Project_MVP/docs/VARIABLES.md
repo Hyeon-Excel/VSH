@@ -41,6 +41,9 @@
 - `osv_status`: OSV verifier 결과 (`FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`)
 - `osv_summary`: OSV verifier 상세 요약
 - `verification_summary`: verifier 결과를 합친 최종 요약
+- `patch_status`: patch preview 생성 상태 (`GENERATED`, `NOT_GENERATED`)
+- `patch_summary`: patch 생성 결과 요약
+- `patch_diff`: unified diff 형식의 patch preview
 - `analysis_error`: L2 분석 실패 시 저장되는 오류 메시지
 
 ### Status Allowed Values

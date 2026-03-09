@@ -51,6 +51,9 @@
 | `osv_status` | `str \| None` | OSV verifier 결과 상태 |
 | `osv_summary` | `str \| None` | OSV verifier 상세 설명 |
 | `verification_summary` | `str \| None` | verifier 결과를 합친 요약 |
+| `patch_status` | `str \| None` | patch preview 생성 상태 |
+| `patch_summary` | `str \| None` | patch preview 생성 요약 |
+| `patch_diff` | `str \| None` | unified diff 형식 patch preview |
 | `original_code` | `str` | 수정 전 원본 코드 |
 | `fixed_code` | `str` | 수정 후 제안 코드 |
 | `description` | `str` | 수정 내용에 대한 설명 |

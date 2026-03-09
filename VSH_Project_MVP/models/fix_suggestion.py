@@ -30,6 +30,9 @@ class FixSuggestion(BaseModel):
     osv_status: str | None = None
     osv_summary: str | None = None
     verification_summary: str | None = None
+    patch_status: str | None = None
+    patch_summary: str | None = None
+    patch_diff: str | None = None
     original_code: str
     fixed_code: str
     description: str

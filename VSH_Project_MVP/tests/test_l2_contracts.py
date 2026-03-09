@@ -78,6 +78,9 @@ def test_fix_suggestion_preserves_l2_metadata():
     assert payload["osv_status"] is None
     assert payload["osv_summary"] is None
     assert payload["verification_summary"] is None
+    assert payload["patch_status"] is None
+    assert payload["patch_summary"] is None
+    assert payload["patch_diff"] is None
 
 
 def test_pipeline_package_exports_factory_without_optional_import_masking():
@@ -129,6 +132,10 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["fix_suggestions"][0]["kisa_reference"] == "KISA DB-01"
     assert result["fix_suggestions"][0]["evidence_refs"] == ["CWE-89", "KISA 시큐어코딩 DB-01"]
     assert result["fix_suggestions"][0]["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
+    assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
+    assert result["fix_suggestions"][0]["patch_summary"]
+    assert "-cursor.execute(query % user_input)" in (result["fix_suggestions"][0]["patch_diff"] or "")
+    assert "+cursor.execute(query, (user_input,))" in (result["fix_suggestions"][0]["patch_diff"] or "")
     assert len(log_repo.saved) == 1
     assert log_repo.saved[0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
     assert log_repo.saved[0]["file_path"] == str(vulnerable_file)
@@ -139,6 +146,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert log_repo.saved[0]["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
     assert log_repo.saved[0]["registry_status"] is None
     assert log_repo.saved[0]["osv_status"] is None
+    assert log_repo.saved[0]["patch_status"] == "GENERATED"
+    assert log_repo.saved[0]["patch_summary"]
+    assert log_repo.saved[0]["patch_diff"]
 
 
 def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
@@ -181,9 +191,13 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     assert result["fix_suggestions"][0]["osv_status"] == "FOUND"
     assert "requests==2.9.0" in (result["fix_suggestions"][0]["registry_summary"] or "")
     assert "CVE-2018-18074" in (result["fix_suggestions"][0]["osv_summary"] or "")
+    assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
+    assert "-requests==2.9.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
+    assert "+requests>=2.20.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
     assert log_repo.saved[0]["file_path"] == str(requirements_file)
     assert log_repo.saved[0]["issue_id"] == f"{requirements_file}_CWE-829_1"
     assert log_repo.saved[0]["verification_summary"]
+    assert log_repo.saved[0]["patch_summary"]
 
 
 def test_pipeline_logs_analysis_failures(tmp_path):
@@ -217,6 +231,8 @@ def test_pipeline_logs_analysis_failures(tmp_path):
     assert log_repo.saved[0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
     assert log_repo.saved[0]["registry_status"] is None
     assert log_repo.saved[0]["osv_status"] is None
+    assert log_repo.saved[0]["patch_status"] is None
+    assert log_repo.saved[0]["patch_diff"] is None
 
 
 def test_deduplicate_keeps_findings_from_different_files():
