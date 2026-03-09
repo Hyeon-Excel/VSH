@@ -2,6 +2,7 @@ import os
 from typing import Dict, List, Optional
 from .base_pipeline import BasePipeline
 from modules.base_module import BaseScanner, BaseAnalyzer
+from layer2.patch_builder import PatchBuilder
 from layer2.retriever.evidence_retriever import EvidenceRetriever
 from layer2.verifier.registry_verifier import RegistryVerifier
 from layer2.verifier.osv_verifier import OsvVerifier
@@ -23,12 +24,14 @@ class AnalysisPipeline(BasePipeline):
                  log_repo: BaseWriteRepository,
                  evidence_retriever: EvidenceRetriever | None = None,
                  registry_verifier: RegistryVerifier | None = None,
-                 osv_verifier: OsvVerifier | None = None):
+                 osv_verifier: OsvVerifier | None = None,
+                 patch_builder: PatchBuilder | None = None):
         self.scanners = scanners
         self.analyzer = analyzer
         self.evidence_retriever = evidence_retriever or EvidenceRetriever()
         self.registry_verifier = registry_verifier or RegistryVerifier()
         self.osv_verifier = osv_verifier or OsvVerifier()
+        self.patch_builder = patch_builder or PatchBuilder()
         self.knowledge_repo = knowledge_repo
         self.fix_repo = fix_repo
         self.log_repo = log_repo
@@ -127,6 +130,7 @@ class AnalysisPipeline(BasePipeline):
                             matching_vuln,
                             verification_map,
                         )
+                        patch_context = self.patch_builder.build(matching_vuln, suggestion)
                         canonical_issue_id = self._build_issue_id(
                             finding_file_path,
                             matching_vuln.cwe_id,
@@ -149,6 +153,9 @@ class AnalysisPipeline(BasePipeline):
                                     suggestion.verification_summary
                                     or verification_context.get("verification_summary")
                                 ),
+                                "patch_status": suggestion.patch_status or patch_context.get("patch_status"),
+                                "patch_summary": suggestion.patch_summary or patch_context.get("patch_summary"),
+                                "patch_diff": suggestion.patch_diff or patch_context.get("patch_diff"),
                             }
                         )
                         log_data = {
@@ -170,6 +177,9 @@ class AnalysisPipeline(BasePipeline):
                             "osv_status": normalized_suggestion.osv_status,
                             "osv_summary": normalized_suggestion.osv_summary,
                             "verification_summary": normalized_suggestion.verification_summary,
+                            "patch_status": normalized_suggestion.patch_status,
+                            "patch_summary": normalized_suggestion.patch_summary,
+                            "patch_diff": normalized_suggestion.patch_diff,
                             "status": "pending"
                         }
                         suggestion.issue_id = normalized_suggestion.issue_id
@@ -184,6 +194,9 @@ class AnalysisPipeline(BasePipeline):
                         suggestion.osv_status = normalized_suggestion.osv_status
                         suggestion.osv_summary = normalized_suggestion.osv_summary
                         suggestion.verification_summary = normalized_suggestion.verification_summary
+                        suggestion.patch_status = normalized_suggestion.patch_status
+                        suggestion.patch_summary = normalized_suggestion.patch_summary
+                        suggestion.patch_diff = normalized_suggestion.patch_diff
                         self.log_repo.save(log_data)
 
         # 8. 결과 dict로 변환 (Pydantic model_dump 사용)
@@ -299,6 +312,9 @@ class AnalysisPipeline(BasePipeline):
             "osv_status": verification_context.get("osv_status"),
             "osv_summary": verification_context.get("osv_summary"),
             "verification_summary": verification_context.get("verification_summary"),
+            "patch_status": None,
+            "patch_summary": None,
+            "patch_diff": None,
             "analysis_error": error_message,
             "status": "analysis_failed",
         }

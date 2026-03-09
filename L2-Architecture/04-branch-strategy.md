@@ -41,7 +41,7 @@ main
 - `v0.5.x`: patch 및 integration
 - `v1.0.0`: `layer2 -> main` 머지 검토 가능한 안정 상태
 
-현재 작업 버전은 `v0.4.0-dev`로 본다.
+현재 작업 버전은 `v0.5.0-dev`로 본다.
 
 ## 5. 히스토리 기록 규칙
 
@@ -72,17 +72,18 @@ main
 | 2026-03-09 | v0.2.0 | committed | `d22251a` | 계약 및 파이프라인 안정화 | `file_path` 메타데이터 추가, import lazy loading, SBOM 파일 귀속 수정, `analysis_failed` 로깅, 대시보드 L2 메타데이터 노출, mock analyzer 추가, `LLM_PROVIDER=mock` 기반 로컬 E2E 경로 구축, `requirements.txt` 정리 | `pytest tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `9 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-09 | v0.3.0 | committed | `0c76f33` | evidence retrieval | `EvidenceRetriever` 추가, pipeline -> retriever -> analyzer 흐름 연결, evidence refs / summary 응답 및 로그 반영, 대시보드 evidence 표면 추가 | `pytest tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `11 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-09 | v0.4.0-dev | working tree | `uncommitted` | verifier 구현 및 L2 패키지 분리 | `RegistryVerifier`, `OsvVerifier` 추가, pipeline verification 후처리 연결, verifier 결과를 response/log/dashboard에 반영, L2 전용 파일을 `layer2/` 패키지로 이동 | `pytest tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `14 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
+| 2026-03-09 | v0.5.0-dev | working tree | `uncommitted` | patch builder 구현 | `PatchBuilder` 추가, verifier 이후 patch preview 생성, response/log/dashboard에 patch diff 반영, patch 테스트 추가 | pending |
 
 ## 7. 다음 버전 목표
 
-다음 목표 버전은 `v0.5.0`이다.
+다음 목표 버전은 `v0.6.0`이다.
 
 범위:
 
-- patch builder 구현
-- verifier 결과를 반영한 수정 설명 정교화
-- patch / recommendation 출력 형식 정리
+- patch / recommendation 출력 형식 정교화
+- 처리 경로 가시성 보강
 - integration 품질 보강
+- `layer2 -> main` 머지 전 최종 안정화
 
 ## 8. 문서 유지 방법
 

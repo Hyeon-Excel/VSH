@@ -5,6 +5,7 @@ from .analysis_pipeline import AnalysisPipeline
 from modules.scanner.mock_semgrep_scanner import MockSemgrepScanner as SemgrepScanner
 from modules.scanner.sbom_scanner import SBOMScanner
 from layer2.analyzer.analyzer_factory import AnalyzerFactory
+from layer2.patch_builder import PatchBuilder
 from layer2.retriever.evidence_retriever import EvidenceRetriever
 from layer2.verifier.registry_verifier import RegistryVerifier
 from layer2.verifier.osv_verifier import OsvVerifier
@@ -77,6 +78,7 @@ class PipelineFactory:
             evidence_retriever=EvidenceRetriever(),
             registry_verifier=RegistryVerifier(),
             osv_verifier=OsvVerifier(),
+            patch_builder=PatchBuilder(),
             knowledge_repo=knowledge_repo,
             fix_repo=fix_repo,
             log_repo=log_repo

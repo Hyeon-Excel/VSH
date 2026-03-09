@@ -333,8 +333,15 @@
                     renderAnalysisItem('Registry Verification', formatVerification(log.registry_status, log.registry_summary)),
                     renderAnalysisItem('OSV Verification', formatVerification(log.osv_status, log.osv_summary)),
                     renderAnalysisItem('Verification Summary', log.verification_summary),
+                    renderAnalysisItem('Patch Status', log.patch_status),
+                    renderAnalysisItem('Patch Summary', log.patch_summary),
                     renderAnalysisItem('L2 오류', log.analysis_error, true),
                 ].filter(Boolean).join('');
+
+                const patchSection = log.patch_diff ? `
+                    <div style="margin-top: 12px;"><strong>Patch Preview:</strong></div>
+                    <div class="code-block">${escapeHtml(log.patch_diff)}</div>
+                ` : '';
 
                 const statusLabel = log.status === 'analysis_failed'
                     ? '<div class="issue-status failed">L2 분석에 실패했습니다. 수정 제안 없이 탐지 결과만 저장되었습니다.</div>'
@@ -354,6 +361,7 @@
                     <div style="margin-bottom: 8px;"><strong>원본 코드:</strong></div>
                     <div class="code-block">${escapeHtml(log.original_code || log.code_snippet)}</div>
                     ${analysisItems ? `<div class="analysis-grid">${analysisItems}</div>` : ''}
+                    ${patchSection}
 
                     <button class="toggle-btn" onclick='toggleFixedCode(${issueId})'>수정 코드 보기 ▼</button>
                     
