@@ -5,6 +5,7 @@ import google.generativeai as genai
 from modules.base_module import BaseAnalyzer
 from models.scan_result import ScanResult
 from models.fix_suggestion import FixSuggestion
+from .confidence_support import build_decision_metadata
 
 class GeminiAnalyzer(BaseAnalyzer):
     """
@@ -43,6 +44,7 @@ class GeminiAnalyzer(BaseAnalyzer):
             "1. Is this a real threat? (Reachability) "
             "2. What is the KISA guideline reference? "
             "3. Provide a safe code fix. "
+            "4. Provide decision_status, confidence_score (0-100), and confidence_reason. "
             "Always respond with a JSON array. Never include markdown or code blocks in your response."
         )
 
@@ -65,6 +67,13 @@ class GeminiAnalyzer(BaseAnalyzer):
                     cwe_id = item.get("cwe_id") or context.get("cwe_id")
                     line_number = item.get("line_number") or context.get("line_number")
                     issue_id = self._build_issue_id(file_path, cwe_id, line_number)
+                    decision_status, confidence_score, confidence_reason = build_decision_metadata(
+                        cwe_id,
+                        context,
+                        decision_status=item.get("decision_status"),
+                        confidence_score=item.get("confidence_score"),
+                        confidence_reason=item.get("confidence_reason"),
+                    )
                     
                     suggestion = FixSuggestion(
                         issue_id=issue_id,
@@ -84,6 +93,9 @@ class GeminiAnalyzer(BaseAnalyzer):
                         osv_status=context.get("osv_status"),
                         osv_summary=context.get("osv_summary"),
                         verification_summary=context.get("verification_summary"),
+                        decision_status=decision_status,
+                        confidence_score=confidence_score,
+                        confidence_reason=confidence_reason,
                         original_code=item.get("original_code", ""),
                         fixed_code=item.get("fixed_code", ""),
                         description=item.get("description", "")
@@ -169,7 +181,7 @@ class GeminiAnalyzer(BaseAnalyzer):
             prompt_lines.append(f"Fix Example: {h_info}")
 
         prompt_lines.append("\nRespond ONLY with a JSON array of objects with the following structure:")
-        prompt_lines.append('[{"finding_id": "string", "file_path": "string", "cwe_id": "string", "line_number": int, "is_real_threat": boolean, "reachability": "string", "kisa_reference": "string", "original_code": "string", "fixed_code": "string", "description": "string"}]')
+        prompt_lines.append('[{"finding_id": "string", "file_path": "string", "cwe_id": "string", "line_number": int, "is_real_threat": boolean, "decision_status": "string", "confidence_score": int, "confidence_reason": "string", "reachability": "string", "kisa_reference": "string", "original_code": "string", "fixed_code": "string", "description": "string"}]')
 
         return "\n".join(prompt_lines), finding_context
 

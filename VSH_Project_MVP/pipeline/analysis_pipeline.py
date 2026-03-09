@@ -7,6 +7,7 @@ from layer2.patch_builder import PatchBuilder
 from layer2.retriever.evidence_retriever import EvidenceRetriever
 from layer2.verifier.registry_verifier import RegistryVerifier
 from layer2.verifier.osv_verifier import OsvVerifier
+from layer2.analyzer.confidence_support import build_decision_metadata
 from repository.base_repository import BaseReadRepository, BaseWriteRepository
 from models.vulnerability import Vulnerability
 from models.scan_result import ScanResult
@@ -149,6 +150,19 @@ class AnalysisPipeline(BasePipeline):
                             patch_context=patch_context,
                             analysis_failed=False,
                         )
+                        analysis_context = {
+                            **evidence_context,
+                            **verification_context,
+                        }
+                        # hyeonexcel 수정: analyzer가 필드를 비워도 pipeline 단계에서
+                        # 최종 decision/confidence 메타데이터를 일관되게 보정해서 남긴다.
+                        decision_status, confidence_score, confidence_reason = build_decision_metadata(
+                            matching_vuln.cwe_id,
+                            analysis_context,
+                            decision_status=suggestion.decision_status,
+                            confidence_score=suggestion.confidence_score,
+                            confidence_reason=suggestion.confidence_reason,
+                        )
                         canonical_issue_id = self._build_issue_id(
                             finding_file_path,
                             matching_vuln.cwe_id,
@@ -175,6 +189,9 @@ class AnalysisPipeline(BasePipeline):
                                     suggestion.verification_summary
                                     or verification_context.get("verification_summary")
                                 ),
+                                "decision_status": decision_status,
+                                "confidence_score": confidence_score,
+                                "confidence_reason": confidence_reason,
                                 "patch_status": suggestion.patch_status or patch_context.get("patch_status"),
                                 "patch_summary": suggestion.patch_summary or patch_context.get("patch_summary"),
                                 "patch_diff": suggestion.patch_diff or patch_context.get("patch_diff"),
@@ -208,6 +225,9 @@ class AnalysisPipeline(BasePipeline):
                             "osv_status": normalized_suggestion.osv_status,
                             "osv_summary": normalized_suggestion.osv_summary,
                             "verification_summary": normalized_suggestion.verification_summary,
+                            "decision_status": normalized_suggestion.decision_status,
+                            "confidence_score": normalized_suggestion.confidence_score,
+                            "confidence_reason": normalized_suggestion.confidence_reason,
                             "patch_status": normalized_suggestion.patch_status,
                             "patch_summary": normalized_suggestion.patch_summary,
                             "patch_diff": normalized_suggestion.patch_diff,
@@ -234,6 +254,9 @@ class AnalysisPipeline(BasePipeline):
                         suggestion.osv_status = normalized_suggestion.osv_status
                         suggestion.osv_summary = normalized_suggestion.osv_summary
                         suggestion.verification_summary = normalized_suggestion.verification_summary
+                        suggestion.decision_status = normalized_suggestion.decision_status
+                        suggestion.confidence_score = normalized_suggestion.confidence_score
+                        suggestion.confidence_reason = normalized_suggestion.confidence_reason
                         suggestion.patch_status = normalized_suggestion.patch_status
                         suggestion.patch_summary = normalized_suggestion.patch_summary
                         suggestion.patch_diff = normalized_suggestion.patch_diff
@@ -371,6 +394,9 @@ class AnalysisPipeline(BasePipeline):
             "osv_status": verification_context.get("osv_status"),
             "osv_summary": verification_context.get("osv_summary"),
             "verification_summary": verification_context.get("verification_summary"),
+            "decision_status": "analysis_failed",
+            "confidence_score": 0,
+            "confidence_reason": "L2 분석 실패로 신뢰도를 계산하지 못했습니다.",
             "patch_status": None,
             "patch_summary": None,
             "patch_diff": None,
@@ -549,6 +575,8 @@ class AnalysisPipeline(BasePipeline):
         fix_suggestions: List[FixSuggestion],
         retriever_status: Dict[str, str] | None = None,
     ) -> Dict[str, int | str]:
+        # hyeonexcel 수정: summary는 이미 정규화된 suggestion을 집계만 해야 한다.
+        # 여기서 suggestion을 다시 수정하면 반환 payload와 summary 집계 시점이 달라질 수 있다.
         summary: Dict[str, int | str] = {
             "findings_total": len(findings),
             "fix_suggestions_total": len(fix_suggestions),
@@ -576,6 +604,12 @@ class AnalysisPipeline(BasePipeline):
             ),
             "retrieval_static_only_total": sum(
                 1 for suggestion in fix_suggestions if suggestion.retrieval_backend == "static_only"
+            ),
+            "decision_confirmed_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.decision_status == "confirmed"
+            ),
+            "confidence_high_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.confidence_score >= 85
             ),
         }
         if retriever_status:

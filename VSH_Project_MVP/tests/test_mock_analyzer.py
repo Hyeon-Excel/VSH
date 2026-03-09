@@ -32,6 +32,9 @@ def test_mock_analyzer_uses_fix_repo_templates():
     assert suggestions[0].kisa_reference == "KISA 시큐어코딩 DB-01"
     assert suggestions[0].issue_id == "tests/e2e_target.py_CWE-89_5"
     assert "KISA 시큐어코딩 DB-01" in suggestions[0].evidence_refs
+    assert suggestions[0].decision_status == "confirmed"
+    assert suggestions[0].confidence_score > 0
+    assert suggestions[0].confidence_reason
 
 
 def test_mock_analyzer_builds_dependency_upgrade_suggestion():
@@ -58,6 +61,9 @@ def test_mock_analyzer_builds_dependency_upgrade_suggestion():
     assert "CVE-2018-18074" in (suggestions[0].kisa_reference or "")
     assert suggestions[0].file_path == "requirements.txt"
     assert "Safe floor: 2.20.0" in suggestions[0].evidence_refs
+    assert suggestions[0].decision_status == "confirmed"
+    assert suggestions[0].confidence_score > 0
+    assert suggestions[0].confidence_reason
 
 
 def test_pipeline_factory_supports_mock_provider(monkeypatch):
@@ -120,3 +126,6 @@ def test_mock_analyzer_reflects_verification_context_in_supply_chain_output():
     assert suggestion.chroma_hits == 2
     assert "Registry[FOUND]" in (suggestion.reachability or "")
     assert "검증 결과:" in suggestion.description
+    assert suggestion.decision_status == "confirmed"
+    assert suggestion.confidence_score >= 85
+    assert suggestion.confidence_reason
