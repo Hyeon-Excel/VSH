@@ -1,0 +1,62 @@
+{
+  "findings": [
+    {
+      "id": "l1-fecd179ddb76",
+      "rule_id": "vsh.common.secret.hardcoded",
+      "severity": "HIGH",
+      "category": "CODE",
+      "location": {
+        "file_path": "/Users/hyeonexcel/Documents/Workspace/VSH/tests/fixtures/javascript_multi_bad.js",
+        "start_line": 1,
+        "start_col": 7,
+        "end_line": 1,
+        "end_col": 51
+      },
+      "cwe": [
+        "CWE-798"
+      ],
+      "owasp": [
+        "A02"
+      ],
+      "kisa_key": "SECRETS_MANAGEMENT_1",
+      "fsec_key": "COMMON_1_1",
+      "message": "Potential hardcoded secret detected.",
+      "reachability_hint": "UNKNOWN",
+      "confidence": 0.8,
+      "evidence_refs": [],
+      "rationale": null,
+      "recommendation": null
+    },
+    {
+      "id": "l1-41eee7c6fed4",
+      "rule_id": "vsh.js.xss.innerhtml",
+      "severity": "HIGH",
+      "category": "CODE",
+      "location": {
+        "file_path": "/Users/hyeonexcel/Documents/Workspace/VSH/tests/fixtures/javascript_multi_bad.js",
+        "start_line": 5,
+        "start_col": 3,
+        "end_line": 5,
+        "end_col": 38
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "owasp": [
+        "A03"
+      ],
+      "kisa_key": "OUTPUT_ENCODING_1",
+      "fsec_key": "WEB_3_2",
+      "message": "Potential XSS via innerHTML assignment.",
+      "reachability_hint": "YES",
+      "confidence": 0.9,
+      "evidence_refs": [],
+      "rationale": null,
+      "recommendation": null
+    }
+  ],
+  "import_candidates": [],
+  "annotation_patch": "",
+  "timing_ms": 1316,
+  "errors": []
+}

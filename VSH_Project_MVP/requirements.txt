@@ -1,0 +1,8 @@
+requests==2.9.0
+flask==2.10.0
+google-generativeai
+jinja2
+python-multipart
+pytest
+anthropic>=0.40.0
+chromadb>=0.5.0

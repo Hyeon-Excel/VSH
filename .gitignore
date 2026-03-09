@@ -1,0 +1,23 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Python tooling
+.pytest_cache/
+.venv/
+.env
+
+# Runtime logs
+vsh_logs.json
+
+# 백업 파일
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude memory (로컬 전용)
+.claude/
