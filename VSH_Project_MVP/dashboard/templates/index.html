@@ -335,6 +335,11 @@
                     renderAnalysisItem('Verification Summary', log.verification_summary),
                     renderAnalysisItem('Patch Status', log.patch_status),
                     renderAnalysisItem('Patch Summary', log.patch_summary),
+                    renderAnalysisItem('Processing Summary', log.processing_summary),
+                    renderAnalysisItem(
+                        'Processing Trace',
+                        Array.isArray(log.processing_trace) ? log.processing_trace.join('\n') : '',
+                    ),
                     renderAnalysisItem('L2 오류', log.analysis_error, true),
                 ].filter(Boolean).join('');
 
