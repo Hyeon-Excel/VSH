@@ -41,7 +41,7 @@ main
 - `v0.5.x`: patch 및 integration
 - `v1.0.0`: `layer2 -> main` 머지 검토 가능한 안정 상태
 
-현재 작업 버전은 `v0.7.0-dev`로 본다.
+현재 작업 버전은 `v0.7.1-dev`로 본다.
 
 ## 5. 히스토리 기록 규칙
 
@@ -73,7 +73,7 @@ main
 | 2026-03-09 | v0.3.0 | committed | `0c76f33` | evidence retrieval | `EvidenceRetriever` 추가, pipeline -> retriever -> analyzer 흐름 연결, evidence refs / summary 응답 및 로그 반영, 대시보드 evidence 표면 추가 | `pytest tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `11 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-09 | v0.4.0 | committed | `f59a925` | verifier 구현 및 L2 패키지 분리 | `RegistryVerifier`, `OsvVerifier` 추가, pipeline verification 후처리 연결, verifier 결과를 response/log/dashboard에 반영, L2 전용 파일을 `layer2/` 패키지로 이동 | `pytest tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `14 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-09 | v0.5.0 | committed | `657b566` | patch builder 구현 | `PatchBuilder` 추가, verifier 이후 patch preview 생성, response/log/dashboard에 patch diff 반영, patch 테스트 추가 | `pytest tests/test_l2_patch_builder.py tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `16 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
-| 2026-03-09 | v0.7.0-dev | working tree | `uncommitted` | L3 handoff 응답 정제 | `category`, `remediation_kind`, `target_ref` 추가, run summary에 code/supply chain 카운트 반영, response/log/dashboard에 handoff 필드 노출 | `pytest tests/test_l2_patch_builder.py tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `16 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
+| 2026-03-09 | v0.7.1-dev | working tree | `uncommitted` | 런타임 경로 안정화 및 Chroma 진단 보강 | `LOG_PATH`를 프로젝트 절대 경로 기준으로 정리하고, `retrieval_backend`, `chroma_status`, `chroma_summary`, `chroma_hits`를 response/log/dashboard/summary에 반영해 Chroma fallback 원인을 가시화 | `cd VSH_Project_MVP && python -m pytest tests -q` -> `22 passed, 1 skipped`, 저장소 루트 실행 시 mock log 저장 및 summary의 `chroma_status=MISSING_DEPENDENCY` 확인 |
 
 ## 7. 다음 버전 목표
 

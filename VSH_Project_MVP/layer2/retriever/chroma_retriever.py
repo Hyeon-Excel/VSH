@@ -29,6 +29,7 @@ class ChromaRetriever:
         self._collection_name = collection_name
         self._client = None
         self._collection = None
+        self._last_error: str | None = None
         self._ready = _CHROMA_OK and self._db_dir.exists()
 
         if self._ready:
@@ -37,6 +38,30 @@ class ChromaRetriever:
     @property
     def ready(self) -> bool:
         return bool(self._ready and self._collection is not None)
+
+    @property
+    def status(self) -> str:
+        if self.ready:
+            return "READY"
+        if not _CHROMA_OK:
+            return "MISSING_DEPENDENCY"
+        if not self._db_dir.exists():
+            return "DB_NOT_FOUND"
+        if self._last_error:
+            return "INIT_FAILED"
+        return "DISABLED"
+
+    @property
+    def status_summary(self) -> str:
+        if self.ready:
+            return f"Chroma collection `{self._collection_name}` 연결이 활성화되었습니다."
+        if not _CHROMA_OK:
+            return "chromadb 패키지가 설치되지 않아 Chroma RAG가 비활성화되었습니다."
+        if not self._db_dir.exists():
+            return f"Chroma DB 경로를 찾지 못했습니다: {self._db_dir}"
+        if self._last_error:
+            return f"Chroma 초기화에 실패했습니다: {self._last_error}"
+        return "Chroma RAG가 비활성 상태입니다."
 
     def query(self, cwe_id: str, code_snippet: str = "", n_results: int = 5) -> list[dict]:
         if not self.ready:
@@ -115,7 +140,8 @@ class ChromaRetriever:
                 name=self._collection_name,
                 embedding_function=ef,
             )
-        except Exception:
+        except Exception as exc:
+            self._last_error = str(exc)
             self._ready = False
             self._collection = None
 

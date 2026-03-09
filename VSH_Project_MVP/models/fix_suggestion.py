@@ -25,6 +25,10 @@ class FixSuggestion(BaseModel):
     kisa_reference: str | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     evidence_summary: str | None = None
+    retrieval_backend: str | None = None
+    chroma_status: str | None = None
+    chroma_summary: str | None = None
+    chroma_hits: int = Field(default=0, ge=0)
     registry_status: str | None = None
     registry_summary: str | None = None
     osv_status: str | None = None

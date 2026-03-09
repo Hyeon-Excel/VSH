@@ -43,12 +43,13 @@ class AnalysisPipeline(BasePipeline):
         파일이 없으면 빈 결과 dict를 반환합니다.
         """
         if not os.path.exists(file_path):
+            retriever_status = self._get_retriever_status()
             return {
                 "file_path": file_path,
                 "scan_results": [],
                 "fix_suggestions": [],
                 "is_clean": True,
-                "summary": self._build_run_summary([], []),
+                "summary": self._build_run_summary([], [], retriever_status),
             }
 
         # 1. 각 Scanner 실행
@@ -78,6 +79,8 @@ class AnalysisPipeline(BasePipeline):
 
         is_clean = integrated_scan_result.is_clean()
         fix_suggestions: List[FixSuggestion] = []
+        retriever_status = self._get_retriever_status()
+        evidence_map: Dict[str, Dict] = {}
 
         if not is_clean:
             # 5. Repository에서 데이터 조회
@@ -155,6 +158,10 @@ class AnalysisPipeline(BasePipeline):
                                 "line_number": matching_vuln.line_number,
                                 "evidence_refs": suggestion.evidence_refs or evidence_context.get("evidence_refs", []),
                                 "evidence_summary": suggestion.evidence_summary or evidence_context.get("evidence_summary"),
+                                "retrieval_backend": suggestion.retrieval_backend or evidence_context.get("retrieval_backend"),
+                                "chroma_status": suggestion.chroma_status or evidence_context.get("chroma_status"),
+                                "chroma_summary": suggestion.chroma_summary or evidence_context.get("chroma_summary"),
+                                "chroma_hits": max(suggestion.chroma_hits, evidence_context.get("chroma_hits", 0)),
                                 "kisa_reference": suggestion.kisa_reference or evidence_context.get("primary_reference"),
                                 "registry_status": suggestion.registry_status or verification_context.get("registry_status"),
                                 "registry_summary": suggestion.registry_summary or verification_context.get("registry_summary"),
@@ -188,6 +195,10 @@ class AnalysisPipeline(BasePipeline):
                             "kisa_reference": normalized_suggestion.kisa_reference,
                             "evidence_refs": normalized_suggestion.evidence_refs,
                             "evidence_summary": normalized_suggestion.evidence_summary,
+                            "retrieval_backend": normalized_suggestion.retrieval_backend,
+                            "chroma_status": normalized_suggestion.chroma_status,
+                            "chroma_summary": normalized_suggestion.chroma_summary,
+                            "chroma_hits": normalized_suggestion.chroma_hits,
                             "registry_status": normalized_suggestion.registry_status,
                             "registry_summary": normalized_suggestion.registry_summary,
                             "osv_status": normalized_suggestion.osv_status,
@@ -209,6 +220,10 @@ class AnalysisPipeline(BasePipeline):
                         suggestion.line_number = normalized_suggestion.line_number
                         suggestion.evidence_refs = normalized_suggestion.evidence_refs
                         suggestion.evidence_summary = normalized_suggestion.evidence_summary
+                        suggestion.retrieval_backend = normalized_suggestion.retrieval_backend
+                        suggestion.chroma_status = normalized_suggestion.chroma_status
+                        suggestion.chroma_summary = normalized_suggestion.chroma_summary
+                        suggestion.chroma_hits = normalized_suggestion.chroma_hits
                         suggestion.kisa_reference = normalized_suggestion.kisa_reference
                         suggestion.registry_status = normalized_suggestion.registry_status
                         suggestion.registry_summary = normalized_suggestion.registry_summary
@@ -231,8 +246,17 @@ class AnalysisPipeline(BasePipeline):
             "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
             "fix_suggestions": [f.model_dump() for f in fix_suggestions],
             "is_clean": is_clean,
-            "summary": self._build_run_summary(integrated_scan_result.findings, fix_suggestions),
+            "summary": self._build_run_summary(
+                integrated_scan_result.findings,
+                fix_suggestions,
+                retriever_status,
+            ),
         }
+
+    def _get_retriever_status(self) -> Dict[str, str]:
+        if hasattr(self.evidence_retriever, "runtime_status"):
+            return self.evidence_retriever.runtime_status()
+        return {}
 
     @staticmethod
     def _deduplicate(findings: List[Vulnerability]) -> List[Vulnerability]:
@@ -334,6 +358,10 @@ class AnalysisPipeline(BasePipeline):
             "kisa_reference": evidence_context.get("primary_reference"),
             "evidence_refs": evidence_context.get("evidence_refs", []),
             "evidence_summary": evidence_context.get("evidence_summary"),
+            "retrieval_backend": evidence_context.get("retrieval_backend"),
+            "chroma_status": evidence_context.get("chroma_status"),
+            "chroma_summary": evidence_context.get("chroma_summary"),
+            "chroma_hits": evidence_context.get("chroma_hits", 0),
             "registry_status": verification_context.get("registry_status"),
             "registry_summary": verification_context.get("registry_summary"),
             "osv_status": verification_context.get("osv_status"),
@@ -464,6 +492,14 @@ class AnalysisPipeline(BasePipeline):
         else:
             trace.append("retrieval:skipped")
 
+        retrieval_backend = evidence_context.get("retrieval_backend")
+        if retrieval_backend:
+            trace.append(f"retrieval:backend:{retrieval_backend}")
+
+        chroma_status = evidence_context.get("chroma_status")
+        if chroma_status:
+            trace.append(f"retrieval:chroma:{chroma_status}")
+
         registry_status = verification_context.get("registry_status")
         if registry_status:
             trace.append(f"verification:registry:{registry_status}")
@@ -490,8 +526,12 @@ class AnalysisPipeline(BasePipeline):
         return " -> ".join(trace) if trace else None
 
     @staticmethod
-    def _build_run_summary(findings: List[Vulnerability], fix_suggestions: List[FixSuggestion]) -> Dict[str, int]:
-        return {
+    def _build_run_summary(
+        findings: List[Vulnerability],
+        fix_suggestions: List[FixSuggestion],
+        retriever_status: Dict[str, str] | None = None,
+    ) -> Dict[str, int | str]:
+        summary: Dict[str, int | str] = {
             "findings_total": len(findings),
             "fix_suggestions_total": len(fix_suggestions),
             "code_findings_total": sum(1 for finding in findings if finding.cwe_id != "CWE-829"),
@@ -510,7 +550,20 @@ class AnalysisPipeline(BasePipeline):
             "patch_generated_total": sum(
                 1 for suggestion in fix_suggestions if suggestion.patch_status == "GENERATED"
             ),
+            "chroma_enriched_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.chroma_hits > 0
+            ),
+            "retrieval_hybrid_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.retrieval_backend == "hybrid"
+            ),
+            "retrieval_static_only_total": sum(
+                1 for suggestion in fix_suggestions if suggestion.retrieval_backend == "static_only"
+            ),
         }
+        if retriever_status:
+            summary["chroma_status"] = retriever_status.get("status", "UNKNOWN")
+            summary["chroma_summary"] = retriever_status.get("summary", "")
+        return summary
 
     @staticmethod
     def _classify_category(cwe_id: str) -> str:
