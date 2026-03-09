@@ -64,6 +64,10 @@ class MockAnalyzer(BaseAnalyzer):
                     file_path,
                     knowledge_entry,
                 )
+            verification_summary = evidence_context.get("verification_summary")
+            description_text = evidence_context.get("remediation_summary") or description
+            if verification_summary and verification_summary not in description_text:
+                description_text = f"{description_text} 검증 결과: {verification_summary}"
 
             suggestions.append(
                 FixSuggestion(
@@ -71,13 +75,26 @@ class MockAnalyzer(BaseAnalyzer):
                     file_path=file_path,
                     cwe_id=finding.cwe_id,
                     line_number=finding.line_number,
-                    reachability=self._build_reachability(finding.cwe_id, file_path),
+                    reachability=self._build_reachability(
+                        finding.cwe_id,
+                        file_path,
+                        verification_summary=verification_summary,
+                    ),
                     kisa_reference=primary_reference,
                     evidence_refs=evidence_refs,
                     evidence_summary=evidence_summary,
+                    retrieval_backend=evidence_context.get("retrieval_backend"),
+                    chroma_status=evidence_context.get("chroma_status"),
+                    chroma_summary=evidence_context.get("chroma_summary"),
+                    chroma_hits=evidence_context.get("chroma_hits", 0),
+                    registry_status=evidence_context.get("registry_status"),
+                    registry_summary=evidence_context.get("registry_summary"),
+                    osv_status=evidence_context.get("osv_status"),
+                    osv_summary=evidence_context.get("osv_summary"),
+                    verification_summary=verification_summary,
                     original_code=finding.code_snippet,
                     fixed_code=evidence_context.get("recommended_fix") or fixed_code,
-                    description=evidence_context.get("remediation_summary") or description,
+                    description=description_text,
                 )
             )
 
@@ -130,11 +147,19 @@ class MockAnalyzer(BaseAnalyzer):
         return package_name, fixed_requirement, " | ".join(reference_parts)
 
     @staticmethod
-    def _build_reachability(cwe_id: str, file_path: str) -> str:
+    def _build_reachability(
+        cwe_id: str,
+        file_path: str,
+        verification_summary: str | None = None,
+    ) -> str:
         file_name = Path(file_path).name
         if cwe_id == "CWE-829":
-            return f"{file_name}에 취약 버전 의존성이 직접 선언되어 있어 즉시 수정 대상입니다."
-        return f"{file_name}에서 탐지 규칙과 일치하는 위험 코드가 직접 발견되었습니다."
+            base = f"{file_name}에 취약 버전 의존성이 직접 선언되어 있어 즉시 수정 대상입니다."
+        else:
+            base = f"{file_name}에서 탐지 규칙과 일치하는 위험 코드가 직접 발견되었습니다."
+        if verification_summary:
+            return f"{base} {verification_summary}"
+        return base
 
     @staticmethod
     def _build_evidence_summary(cwe_id: str, file_path: str, knowledge_entry: Dict) -> str:

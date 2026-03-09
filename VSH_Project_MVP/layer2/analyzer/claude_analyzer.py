@@ -80,6 +80,15 @@ class ClaudeAnalyzer(BaseAnalyzer):
                         kisa_reference=item.get("kisa_reference") or context.get("primary_reference"),
                         evidence_refs=context.get("evidence_refs", []),
                         evidence_summary=context.get("evidence_summary"),
+                        retrieval_backend=context.get("retrieval_backend"),
+                        chroma_status=context.get("chroma_status"),
+                        chroma_summary=context.get("chroma_summary"),
+                        chroma_hits=context.get("chroma_hits", 0),
+                        registry_status=context.get("registry_status"),
+                        registry_summary=context.get("registry_summary"),
+                        osv_status=context.get("osv_status"),
+                        osv_summary=context.get("osv_summary"),
+                        verification_summary=context.get("verification_summary"),
                         original_code=item.get("original_code", ""),
                         fixed_code=item.get("fixed_code", ""),
                         description=item.get("description", "")
@@ -131,6 +140,15 @@ class ClaudeAnalyzer(BaseAnalyzer):
                 "primary_reference": evidence_context.get("primary_reference"),
                 "evidence_refs": refs,
                 "evidence_summary": evidence_context.get("evidence_summary"),
+                "retrieval_backend": evidence_context.get("retrieval_backend"),
+                "chroma_status": evidence_context.get("chroma_status"),
+                "chroma_summary": evidence_context.get("chroma_summary"),
+                "chroma_hits": evidence_context.get("chroma_hits", 0),
+                "registry_status": evidence_context.get("registry_status"),
+                "registry_summary": evidence_context.get("registry_summary"),
+                "osv_status": evidence_context.get("osv_status"),
+                "osv_summary": evidence_context.get("osv_summary"),
+                "verification_summary": evidence_context.get("verification_summary"),
             }
 
             prompt_lines.append(f"---")
@@ -145,6 +163,14 @@ class ClaudeAnalyzer(BaseAnalyzer):
                 prompt_lines.append(f"Evidence Summary: {evidence_context['evidence_summary']}")
             if refs:
                 prompt_lines.append(f"Evidence References: {', '.join(refs)}")
+            if evidence_context.get("retrieval_backend"):
+                prompt_lines.append(f"Retrieval Backend: {evidence_context['retrieval_backend']}")
+            if evidence_context.get("chroma_status"):
+                prompt_lines.append(f"Chroma Status: {evidence_context['chroma_status']}")
+            if evidence_context.get("chroma_summary"):
+                prompt_lines.append(f"Chroma Summary: {evidence_context['chroma_summary']}")
+            if evidence_context.get("verification_summary"):
+                prompt_lines.append(f"Verification Summary: {evidence_context['verification_summary']}")
             prompt_lines.append(f"Fix Example: {h_info}")
 
         prompt_lines.append("\nRespond ONLY with a JSON array of objects with the following structure:")

@@ -95,13 +95,17 @@ class AnalysisPipeline(BasePipeline):
                 default_file_path=file_path,
                 findings=unique_findings,
             )
+            analysis_context_map = self._build_analysis_context_map(
+                evidence_map=evidence_map,
+                verification_map=verification_map,
+            )
 
             # 6. Analyzer 실행 (L2)
             fix_suggestions = self.analyzer.analyze(
                 integrated_scan_result,
                 knowledge_data,
                 fix_data,
-                evidence_map,
+                analysis_context_map,
             )
             analysis_error = getattr(self.analyzer, "last_error", None)
 
@@ -422,6 +426,20 @@ class AnalysisPipeline(BasePipeline):
             finding.line_number,
         )
         return verification_map.get(issue_id, {})
+
+    @staticmethod
+    def _build_analysis_context_map(
+        evidence_map: Dict[str, Dict],
+        verification_map: Dict[str, Dict],
+    ) -> Dict[str, Dict]:
+        issue_ids = set(evidence_map.keys()) | set(verification_map.keys())
+        return {
+            issue_id: {
+                **evidence_map.get(issue_id, {}),
+                **verification_map.get(issue_id, {}),
+            }
+            for issue_id in issue_ids
+        }
 
     def _build_verification_map(
         self,

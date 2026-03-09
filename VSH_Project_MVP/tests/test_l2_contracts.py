@@ -24,6 +24,16 @@ class DummyAnalyzer:
         return [self.suggestion]
 
 
+class CapturingAnalyzer(DummyAnalyzer):
+    def __init__(self, suggestion: FixSuggestion):
+        super().__init__(suggestion)
+        self.captured_evidence_map = None
+
+    def analyze(self, scan_result, knowledge, fix_hints, evidence_map=None):
+        self.captured_evidence_map = evidence_map
+        return super().analyze(scan_result, knowledge, fix_hints, evidence_map=evidence_map)
+
+
 class FailingAnalyzer:
     def __init__(self, error_message: str):
         self.last_error = error_message
@@ -237,6 +247,50 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert result["summary"]["chroma_status"] == "MISSING_DEPENDENCY"
     assert result["summary"]["retrieval_static_only_total"] == 1
     assert result["summary"]["chroma_enriched_total"] == 0
+
+
+def test_pipeline_passes_verification_context_into_analyzer(tmp_path):
+    scanned_file = tmp_path / "app.py"
+    scanned_file.write_text("print('hello')\n", encoding="utf-8")
+    requirements_file = tmp_path / "requirements.txt"
+    requirements_file.write_text("requests==2.9.0\n", encoding="utf-8")
+
+    finding = Vulnerability(
+        file_path=str(requirements_file),
+        cwe_id="CWE-829",
+        severity="HIGH",
+        line_number=1,
+        code_snippet="requests==2.9.0",
+    )
+    suggestion = FixSuggestion(
+        issue_id=f"{requirements_file}_CWE-829_1",
+        file_path=str(requirements_file),
+        cwe_id="CWE-829",
+        line_number=1,
+        original_code="requests==2.9.0",
+        fixed_code="requests>=2.20.0",
+        description="Upgrade the vulnerable dependency.",
+    )
+    analyzer = CapturingAnalyzer(suggestion)
+    pipeline = AnalysisPipeline(
+        scanners=[DummyScanner(finding)],
+        analyzer=analyzer,
+        evidence_retriever=DummyEvidenceRetriever(retrieval_backend="hybrid", chroma_status="READY", chroma_hits=2),
+        knowledge_repo=DummyReadRepo(),
+        fix_repo=DummyReadRepo(),
+        log_repo=DummyWriteRepo(),
+    )
+
+    pipeline.run(str(scanned_file))
+
+    assert analyzer.captured_evidence_map is not None
+    context = analyzer.captured_evidence_map[f"{requirements_file}_CWE-829_1"]
+    assert context["retrieval_backend"] == "hybrid"
+    assert context["chroma_status"] == "READY"
+    assert context["chroma_hits"] == 2
+    assert context["registry_status"] == "FOUND"
+    assert context["osv_status"] == "FOUND"
+    assert context["verification_summary"]
 
 
 def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):

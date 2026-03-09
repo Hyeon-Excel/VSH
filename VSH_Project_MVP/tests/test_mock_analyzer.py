@@ -68,3 +68,55 @@ def test_pipeline_factory_supports_mock_provider(monkeypatch):
     pipeline = PipelineFactory.create()
 
     assert pipeline.analyzer.__class__.__name__ == "MockAnalyzer"
+
+
+def test_mock_analyzer_reflects_verification_context_in_supply_chain_output():
+    analyzer = MockAnalyzer()
+    scan_result = ScanResult(
+        file_path="tests/e2e_target.py",
+        language="python",
+        findings=[
+            Vulnerability(
+                file_path="requirements.txt",
+                cwe_id="CWE-829",
+                severity="HIGH",
+                line_number=1,
+                code_snippet="requests==2.9.0",
+            )
+        ],
+    )
+
+    evidence_map = {
+        "requirements.txt_CWE-829_1": {
+            "issue_id": "requirements.txt_CWE-829_1",
+            "file_path": "requirements.txt",
+            "cwe_id": "CWE-829",
+            "line_number": 1,
+            "evidence_refs": ["CWE-829", "CVE-2018-18074"],
+            "evidence_summary": "requirements.txt에 취약 버전 의존성이 탐지되었습니다.",
+            "primary_reference": "CVE-2018-18074",
+            "recommended_fix": "requests>=2.20.0",
+            "registry_status": "FOUND",
+            "registry_summary": "registry에서 requests==2.9.0 선언을 확인했습니다.",
+            "osv_status": "FOUND",
+            "osv_summary": "OSV advisory에서 취약 버전으로 확인되었습니다.",
+            "verification_summary": "Registry[FOUND] registry에서 requests==2.9.0 선언을 확인했습니다. | OSV[FOUND] OSV advisory에서 취약 버전으로 확인되었습니다.",
+            "retrieval_backend": "hybrid",
+            "chroma_status": "READY",
+            "chroma_summary": "Chroma collection `vsh_kisa_guide` 연결이 활성화되었습니다.",
+            "chroma_hits": 2,
+        }
+    }
+
+    suggestions = analyzer.analyze(scan_result, knowledge=[], fix_hints=[], evidence_map=evidence_map)
+
+    assert len(suggestions) == 1
+    suggestion = suggestions[0]
+    assert suggestion.registry_status == "FOUND"
+    assert suggestion.osv_status == "FOUND"
+    assert suggestion.verification_summary
+    assert suggestion.retrieval_backend == "hybrid"
+    assert suggestion.chroma_status == "READY"
+    assert suggestion.chroma_hits == 2
+    assert "Registry[FOUND]" in (suggestion.reachability or "")
+    assert "검증 결과:" in suggestion.description
