@@ -46,6 +46,9 @@
 - `patch_diff`: unified diff 형식의 patch preview
 - `processing_trace`: 스캔부터 patch까지의 처리 단계 목록
 - `processing_summary`: 처리 경로를 한 줄로 요약한 문자열
+- `category`: finding 분류 (`code`, `supply_chain`)
+- `remediation_kind`: 수정 방식 분류 (`code_patch`, `version_bump_patch` 등)
+- `target_ref`: L3 handoff용 대상 식별자 (`file:line` 또는 `dependency:name`)
 - `analysis_error`: L2 분석 실패 시 저장되는 오류 메시지
 
 ### Status Allowed Values

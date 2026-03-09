@@ -35,6 +35,9 @@ class FixSuggestion(BaseModel):
     patch_diff: str | None = None
     processing_trace: list[str] = Field(default_factory=list)
     processing_summary: str | None = None
+    category: str | None = None
+    remediation_kind: str | None = None
+    target_ref: str | None = None
     original_code: str
     fixed_code: str
     description: str
