@@ -115,15 +115,27 @@ def scan_only(file_path: str) -> Dict[str, Any]:
     L2 수정 제안까지 포함한 validate_code와 달리,
     호출자는 scan_result 관점의 최소 정보만 확인할 수 있다.
     """
-    result = _run_analysis(file_path)
-    if "error" in result:
-        return result
+    if not pipeline:
+        return _error_response("Pipeline not initialized.")
 
-    return {
-        "file_path": result.get("file_path"),
-        "scan_results": result.get("scan_results", []),
-        "is_clean": result.get("is_clean", True),
-    }
+    if not file_path:
+        return _error_response("file_path is required.")
+
+    try:
+        if hasattr(pipeline, "run_scan_only"):
+            return pipeline.run_scan_only(file_path)
+
+        result = _run_analysis(file_path)
+        if "error" in result:
+            return result
+
+        return {
+            "file_path": result.get("file_path"),
+            "scan_results": result.get("scan_results", []),
+            "is_clean": result.get("is_clean", True),
+        }
+    except Exception as e:
+        return _error_response(str(e))
 
 
 @mcp.tool()

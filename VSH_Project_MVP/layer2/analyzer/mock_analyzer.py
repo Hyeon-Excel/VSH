@@ -136,14 +136,14 @@ class MockAnalyzer(BaseAnalyzer):
     def _build_dependency_fix(self, requirement_line: str) -> Tuple[str, str, str | None]:
         package_name, _ = parse_requirement_line(requirement_line)
         if not package_name:
-            return "", requirement_line, "Dependency policy"
+            return "", "", "Dependency policy"
 
         vuln_info = VULNERABLE_PACKAGES.get(package_name, {})
         safe_version = vuln_info.get("vulnerable_below")
         if safe_version:
             fixed_requirement = f"{package_name}>={safe_version}"
         else:
-            fixed_requirement = f"{package_name}>=latest"
+            fixed_requirement = package_name
 
         reference_parts = ["Dependency policy"]
         if safe_version:

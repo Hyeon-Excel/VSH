@@ -98,6 +98,25 @@ class AnalysisPipeline(BasePipeline):
             retriever_status=retriever_status,
         )
 
+    def run_scan_only(self, file_path: str) -> dict:
+        """
+        hyeonexcel 수정: MCP `scan_only` 계약을 지키기 위해
+        L2 analyzer/로그 저장 없이 L1 스캔 결과만 반환하는 전용 경로를 제공한다.
+        """
+        if not os.path.exists(file_path):
+            return {
+                "file_path": file_path,
+                "scan_results": [],
+                "is_clean": True,
+            }
+
+        integrated_scan_result = self._build_integrated_scan_result(file_path)
+        return {
+            "file_path": file_path,
+            "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
+            "is_clean": integrated_scan_result.is_clean(),
+        }
+
     def _scan_all_findings(self, file_path: str) -> List[Vulnerability]:
         all_findings: List[Vulnerability] = []
         for scanner in self.scanners:

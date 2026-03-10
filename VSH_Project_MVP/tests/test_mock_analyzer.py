@@ -129,3 +129,23 @@ def test_mock_analyzer_reflects_verification_context_in_supply_chain_output():
     assert suggestion.decision_status == "confirmed"
     assert suggestion.confidence_score >= 85
     assert suggestion.confidence_reason
+
+
+def test_mock_analyzer_dependency_fix_falls_back_to_valid_requirement_when_safe_version_missing():
+    analyzer = MockAnalyzer()
+
+    package_name, fixed_requirement, reference = analyzer._build_dependency_fix("simplejson")
+
+    assert package_name == "simplejson"
+    assert fixed_requirement == "simplejson"
+    assert reference == "Dependency policy"
+
+
+def test_mock_analyzer_dependency_fix_returns_empty_fix_when_requirement_parse_fails():
+    analyzer = MockAnalyzer()
+
+    package_name, fixed_requirement, reference = analyzer._build_dependency_fix("./local-package.whl")
+
+    assert package_name == ""
+    assert fixed_requirement == ""
+    assert reference == "Dependency policy"
