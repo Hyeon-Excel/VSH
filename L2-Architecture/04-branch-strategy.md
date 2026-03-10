@@ -41,7 +41,7 @@ main
 - `v0.5.x`: patch 및 integration
 - `v1.0.0`: `layer2 -> main` 머지 검토 가능한 안정 상태
 
-현재 작업 버전은 `v0.9.0-dev`로 본다.
+현재 작업 버전은 `v0.9.1-dev`로 본다.
 
 ## 5. 히스토리 기록 규칙
 
@@ -74,7 +74,8 @@ main
 | 2026-03-09 | v0.4.0 | committed | `f59a925` | verifier 구현 및 L2 패키지 분리 | `RegistryVerifier`, `OsvVerifier` 추가, pipeline verification 후처리 연결, verifier 결과를 response/log/dashboard에 반영, L2 전용 파일을 `layer2/` 패키지로 이동 | `pytest tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `14 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-09 | v0.5.0 | committed | `657b566` | patch builder 구현 | `PatchBuilder` 추가, verifier 이후 patch preview 생성, response/log/dashboard에 patch diff 반영, patch 테스트 추가 | `pytest tests/test_l2_patch_builder.py tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `16 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-10 | v0.8.2 | committed | `25d0f9e` | MCP 인터페이스 계약 정렬 | `tools/server.py`를 문서 계약 기준 `validate_code`, `scan_only`, `get_results`, `apply_fix`, `dismiss_issue`, `get_log` 형태로 정리하고, 기존 이름은 레거시 wrapper로 유지 | `cd VSH_Project_MVP && python -m pytest tests/test_mcp_server_contract.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_l2_retriever.py tests/test_l2_verifiers.py tests/test_l2_patch_builder.py tests/test_e2e.py -q` -> `29 passed, 1 skipped` |
-| 2026-03-10 | v0.9.0-dev | working tree | `uncommitted` | L2 판단 신뢰도 가시화 | `decision_status`, `confidence_score`, `confidence_reason`을 analyzer/pipeline/UI에 통합하고, run summary에 confidence 집계를 추가해 L2 판단 결과를 더 구조화 | `cd VSH_Project_MVP && python -m pytest tests/test_mcp_server_contract.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_l2_retriever.py tests/test_l2_verifiers.py tests/test_l2_patch_builder.py tests/test_e2e.py -q` -> `29 passed, 1 skipped` |
+| 2026-03-10 | v0.9.0 | committed | `3dc9b3d` | L2 판단 신뢰도 가시화 | `decision_status`, `confidence_score`, `confidence_reason`을 analyzer/pipeline/UI에 통합하고, run summary에 confidence 집계를 추가해 L2 판단 결과를 더 구조화 | `cd VSH_Project_MVP && python -m pytest tests/test_mcp_server_contract.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_l2_retriever.py tests/test_l2_verifiers.py tests/test_l2_patch_builder.py tests/test_e2e.py -q` -> `29 passed, 1 skipped` |
+| 2026-03-10 | v0.9.1-dev | working tree | `uncommitted` | 문서 기준선 및 공급망 공통 유틸 정리 | requirement parser를 `layer2/common`으로 공통화하고, `CONVENTIONS.md`와 `L2-Architecture` 문서를 현재 `VSH_Project_MVP/layer2` 기준에 맞게 갱신 | `cd VSH_Project_MVP && python -m pytest tests/test_l2_retriever.py tests/test_l2_verifiers.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_e2e.py -q` -> `26 passed, 1 skipped` |
 
 ## 7. 다음 버전 목표
 

@@ -1,6 +1,14 @@
 from models.vulnerability import Vulnerability
+from layer2.common.requirement_parser import parse_requirement_line
 from layer2.verifier.registry_verifier import RegistryVerifier
 from layer2.verifier.osv_verifier import OsvVerifier
+
+
+def test_parse_requirement_line_normalizes_package_name():
+    package_name, package_version = parse_requirement_line("Requests==2.9.0")
+
+    assert package_name == "requests"
+    assert package_version == "2.9.0"
 
 
 def test_registry_verifier_detects_dependency_declaration():

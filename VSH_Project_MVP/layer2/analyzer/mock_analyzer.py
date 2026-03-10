@@ -1,7 +1,7 @@
-import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from layer2.common.requirement_parser import parse_requirement_line
 from modules.base_module import BaseAnalyzer
 from models.fix_suggestion import FixSuggestion
 from models.scan_result import ScanResult
@@ -134,11 +134,10 @@ class MockAnalyzer(BaseAnalyzer):
         return fixed_code, description, reference
 
     def _build_dependency_fix(self, requirement_line: str) -> Tuple[str, str, str | None]:
-        match = re.match(r"^([a-zA-Z0-9_\\-]+)(?:[=!<>~]+([0-9\\.]+))?", requirement_line.strip())
-        if not match:
+        package_name, _ = parse_requirement_line(requirement_line)
+        if not package_name:
             return "", requirement_line, "Dependency policy"
 
-        package_name = match.group(1).lower()
         vuln_info = VULNERABLE_PACKAGES.get(package_name, {})
         safe_version = vuln_info.get("vulnerable_below")
         if safe_version:

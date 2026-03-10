@@ -1,9 +1,9 @@
-import re
 from typing import Dict
 
 from packaging.version import InvalidVersion
 from packaging.version import parse as parse_version
 
+from layer2.common.requirement_parser import parse_requirement_line
 from models.vulnerability import Vulnerability
 
 try:
@@ -80,7 +80,4 @@ class OsvVerifier:
 
     @staticmethod
     def _parse_requirement(requirement_line: str) -> tuple[str | None, str | None]:
-        match = re.match(r"^([a-zA-Z0-9_\-]+)(?:[=!<>~]+([0-9\.]+))?", requirement_line.strip())
-        if not match:
-            return None, None
-        return match.group(1).lower(), match.group(2)
+        return parse_requirement_line(requirement_line)
