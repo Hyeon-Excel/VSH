@@ -6,6 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # Base directory for Mock DB
 MOCK_DB_DIR = PROJECT_ROOT / "mock_db"
 CHROMA_DB_DIR = PROJECT_ROOT / ".chroma_db"
+CHROMA_CACHE_DIR = PROJECT_ROOT / ".cache" / "chroma"
 CHROMA_COLLECTION = "vsh_kisa_guide"
 
 # Paths for read-only repositories

@@ -92,5 +92,7 @@
 | 260225 | [결정] E2E 테스트 격리: `tests/e2e_target.py`, `tests/e2e_target_fixed.py` 전용 파일 사용 |
 | 260225 | [결정] 테스트 검증 방식: 수동 UI 확인(UX) + `pytest` 자동 스크립트(API/데이터) 병행 |
 | 260225 | [이슈] CWE-89 패턴 오탐: `knowledge.json` 정규식이 안전한 바인딩 코드도 매칭. 코드 분리(SQL 분리)로 해결 |
-| 260225 | [Post-MVP] google.generativeai → `google.genai` 마이그레이션 (현재 패키지 지원 종료 상태) |
+| 260225 | [Post-MVP] google.generativeai → `google.genai` 마이그레이션 검토 필요 항목으로 기록 |
+| 250310 | [정리] `GeminiAnalyzer`를 `google.genai` SDK 기준으로 마이그레이션 완료 |
+| 250310 | [정리] Chroma 활성 환경에서 exact metadata 기반 retrieval과 파이프라인 연동 검증 완료 |
 | 260225 | [Post-MVP] SBOMScanner 결과 경로 개선, SQLiteLogRepo 도입, diff 뷰어 추가 예정 |

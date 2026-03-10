@@ -5,7 +5,7 @@ anthropic
 chromadb
 fastapi
 fastmcp
-google-generativeai
+google-genai
 jinja2
 packaging
 pydantic>=2,<3

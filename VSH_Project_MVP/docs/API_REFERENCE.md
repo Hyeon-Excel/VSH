@@ -189,4 +189,4 @@ python -m pytest tests/test_e2e.py -v
 
 ### 주의사항
 - **SBOMScanner 특성**: 프로젝트 루트의 `requirements.txt`를 항상 스캔하므로, 개별 파일이 깨끗해도 전체 `is_clean`은 `False`일 수 있습니다. 재스캔 검증 시 특정 CWE ID의 존재 여부로 판단해야 합니다.
-- **Library 마이그레이션**: 현재 `google-generativeai`를 사용 중이나 이미 지원 종료되었습니다. `GeminiAnalyzer` 단일 파일만 `google-genai` 패키지로 교체하여 시스템 전체 수정을 방지할 수 있습니다.
+- **Gemini SDK**: 현재 `GeminiAnalyzer`는 `google-genai` 패키지를 사용합니다. Gemini 관련 의존성 문제를 점검할 때는 `google-generativeai`가 아니라 `google-genai` 설치 여부를 확인해야 합니다.

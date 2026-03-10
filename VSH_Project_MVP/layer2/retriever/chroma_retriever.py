@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -12,9 +13,10 @@ except ImportError:
     _CHROMA_OK = False
 
 try:
-    from config import CHROMA_COLLECTION, CHROMA_DB_DIR
+    from config import CHROMA_COLLECTION, CHROMA_DB_DIR, CHROMA_CACHE_DIR
 except ImportError:
     CHROMA_DB_DIR = str(Path(__file__).parent.parent.parent / ".chroma_db")
+    CHROMA_CACHE_DIR = str(Path(__file__).parent.parent.parent / ".cache" / "chroma")
     CHROMA_COLLECTION = "vsh_kisa_guide"
 
 
@@ -26,6 +28,7 @@ class ChromaRetriever:
 
     def __init__(self, db_dir: Optional[Path] = None, collection_name: str = CHROMA_COLLECTION):
         self._db_dir = Path(db_dir or CHROMA_DB_DIR)
+        self._cache_dir = Path(CHROMA_CACHE_DIR)
         self._collection_name = collection_name
         self._client = None
         self._collection = None
@@ -71,12 +74,14 @@ class ChromaRetriever:
             return []
 
         query_text = self._build_query_text(cwe_id, code_snippet)
-        exact_docs = self._query_collection(
-            query_text=query_text,
-            n_results=n_results,
+        # hyeonexcel 수정: query embedding이 준비되지 않은 로컬 환경에서도
+        # exact metadata 매칭은 collection.get()으로 먼저 처리해 Chroma RAG를 바로 활용할 수 있게 한다.
+        exact_docs = self._get_collection(
             where={"cwe": {"$eq": cwe_id}} if cwe_id else None,
+            limit=max(n_results * 2, n_results),
             default_cwe=cwe_id,
         )
+        exact_docs = self._rank_static_results(exact_docs, query_text, cwe_id)
         if len(exact_docs) >= n_results:
             return exact_docs[:n_results]
 
@@ -86,6 +91,13 @@ class ChromaRetriever:
             where=None,
             default_cwe=cwe_id,
         )
+        if not broad_docs:
+            broad_docs = self._get_collection(
+                where=None,
+                limit=self._collection.count(),
+                default_cwe=cwe_id,
+            )
+            broad_docs = self._rank_static_results(broad_docs, query_text, cwe_id)
         return self._merge_ranked_results(exact_docs, broad_docs, cwe_id, n_results)
 
     def query_by_source(
@@ -134,6 +146,7 @@ class ChromaRetriever:
 
     def _init(self) -> None:
         try:
+            self._configure_embedding_cache()
             ef = embedding_functions.DefaultEmbeddingFunction()
             self._client = chromadb.PersistentClient(path=str(self._db_dir))
             self._collection = self._client.get_collection(
@@ -144,6 +157,35 @@ class ChromaRetriever:
             self._last_error = str(exc)
             self._ready = False
             self._collection = None
+
+    def _configure_embedding_cache(self) -> None:
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("CHROMA_CACHE_DIR", str(self._cache_dir))
+        try:
+            from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
+        except Exception:
+            return
+
+        ONNXMiniLM_L6_V2.DOWNLOAD_PATH = self._cache_dir / "onnx_models" / ONNXMiniLM_L6_V2.MODEL_NAME
+
+    def _get_collection(
+        self,
+        where: dict | None,
+        limit: int,
+        default_cwe: str,
+    ) -> list[dict]:
+        try:
+            raw = self._collection.get(
+                where=where,
+                limit=max(1, limit),
+                include=["documents", "metadatas"],
+            )
+            docs = raw.get("documents", [])
+            metas = raw.get("metadatas", [])
+        except Exception:
+            return []
+
+        return self._parse_raw(docs, metas, default_cwe)
 
     def _query_collection(
         self,
@@ -165,6 +207,22 @@ class ChromaRetriever:
             return []
 
         return self._parse_raw(docs, metas, default_cwe)
+
+    @classmethod
+    def _rank_static_results(
+        cls,
+        docs: list[dict],
+        query_text: str,
+        cwe_id: str,
+    ) -> list[dict]:
+        source_priority = cls._source_priority(cwe_id)
+        return sorted(
+            docs,
+            key=lambda doc: (
+                cls._static_match_rank(doc, query_text, cwe_id),
+                cls._doc_rank(doc, cwe_id, source_priority),
+            ),
+        )
 
     @staticmethod
     def _build_query_text(cwe_id: str, code_snippet: str) -> str:
@@ -225,6 +283,21 @@ class ChromaRetriever:
             "OWASP": 2,
             "NVD": 3,
         }
+
+    @staticmethod
+    def _static_match_rank(doc: dict, query_text: str, cwe_id: str) -> tuple[int, int]:
+        query_tokens = {
+            token
+            for token in query_text.lower().split()
+            if len(token) > 2 and token != cwe_id.lower()
+        }
+        haystack = " ".join(
+            str(doc.get(key, "")).lower()
+            for key in ["title", "text", "source_id", "kisa_article", "owasp_id", "cve_id"]
+        )
+        token_hits = sum(1 for token in query_tokens if token in haystack)
+        exact_cwe_rank = 0 if cwe_id and doc.get("cwe") == cwe_id else 1
+        return (exact_cwe_rank, -token_hits)
 
     @staticmethod
     def _doc_rank(doc: dict, cwe_id: str, source_priority: dict[str, int]) -> tuple[int, int, int, int, int]:
