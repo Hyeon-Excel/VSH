@@ -1,6 +1,7 @@
 from .analyzer_factory import AnalyzerFactory
 
 __all__ = [
+    "BaseLlmAnalyzer",
     "ClaudeAnalyzer",
     "GeminiAnalyzer",
     "MockAnalyzer",
@@ -9,6 +10,10 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    if name == "BaseLlmAnalyzer":
+        from .base_llm_analyzer import BaseLlmAnalyzer
+
+        return BaseLlmAnalyzer
     if name == "ClaudeAnalyzer":
         from .claude_analyzer import ClaudeAnalyzer
 

@@ -43,238 +43,305 @@ class AnalysisPipeline(BasePipeline):
         파일에 대해 L1 스캔, 중복 제거, L2 분석, 결과 저장을 수행합니다.
         파일이 없으면 빈 결과 dict를 반환합니다.
         """
+        retriever_status = self._get_retriever_status()
         if not os.path.exists(file_path):
-            retriever_status = self._get_retriever_status()
-            return {
-                "file_path": file_path,
-                "scan_results": [],
-                "fix_suggestions": [],
-                "is_clean": True,
-                "summary": self._build_run_summary([], [], retriever_status),
-            }
+            return self._build_run_result(file_path, [], [], True, retriever_status)
 
-        # 1. 각 Scanner 실행
+        integrated_scan_result = self._build_integrated_scan_result(file_path)
+        if integrated_scan_result.is_clean():
+            return self._build_run_result(
+                file_path,
+                integrated_scan_result.findings,
+                [],
+                True,
+                retriever_status,
+            )
+
+        knowledge_data, fix_data = self._load_analysis_sources()
+        evidence_map, verification_map, analysis_context_map = self._build_analysis_inputs(
+            file_path=file_path,
+            scan_result=integrated_scan_result,
+            knowledge_data=knowledge_data,
+            fix_data=fix_data,
+        )
+        raw_fix_suggestions = self._run_analyzer(
+            scan_result=integrated_scan_result,
+            knowledge_data=knowledge_data,
+            fix_data=fix_data,
+            analysis_context_map=analysis_context_map,
+        )
+        analysis_error = getattr(self.analyzer, "last_error", None)
+
+        if analysis_error:
+            self._save_analysis_failure_logs(
+                file_path=file_path,
+                findings=integrated_scan_result.findings,
+                evidence_map=evidence_map,
+                verification_map=verification_map,
+                analysis_error=analysis_error,
+            )
+            fix_suggestions: List[FixSuggestion] = []
+        else:
+            fix_suggestions = self._normalize_and_save_suggestions(
+                file_path=file_path,
+                findings=integrated_scan_result.findings,
+                raw_suggestions=raw_fix_suggestions,
+                evidence_map=evidence_map,
+                verification_map=verification_map,
+            )
+
+        return self._build_run_result(
+            file_path=file_path,
+            findings=integrated_scan_result.findings,
+            fix_suggestions=fix_suggestions,
+            is_clean=False,
+            retriever_status=retriever_status,
+        )
+
+    def _scan_all_findings(self, file_path: str) -> List[Vulnerability]:
         all_findings: List[Vulnerability] = []
         for scanner in self.scanners:
-            # 지원하는 언어인지 먼저 확인하거나 예외를 잡을 수 있지만, 
-            # 여기서는 Scanner 내부의 언어 체크에 맡기고 실행
             try:
                 result = scanner.scan(file_path)
                 if result and result.findings:
                     all_findings.extend(result.findings)
             except ValueError as e:
                 print(f"[WARN] Unsupported language: {e}")
-                # 해당 Scanner 결과만 건너뛰고 계속 진행
             except Exception as e:
                 print(f"[WARN] Scanner execution failed: {e}")
-                
-        # 2 & 3. 중복 제거
-        unique_findings = self._deduplicate(all_findings)
-        
-        # 4. 중복 제거된 findings로 새 ScanResult 생성
-        integrated_scan_result = ScanResult(
+        return all_findings
+
+    def _build_integrated_scan_result(self, file_path: str) -> ScanResult:
+        # hyeonexcel 수정: run()에 몰려 있던 스캔/중복 제거/통합 ScanResult 생성을 분리해
+        # 이후 L3 handoff나 멀티 언어 확장 시 입력 단계만 독립적으로 다룰 수 있게 한다.
+        unique_findings = self._deduplicate(self._scan_all_findings(file_path))
+        return ScanResult(
             file_path=file_path,
-            language="python", # MVP에서는 python 고정
-            findings=unique_findings
+            language="python",
+            findings=unique_findings,
         )
 
-        is_clean = integrated_scan_result.is_clean()
-        fix_suggestions: List[FixSuggestion] = []
-        retriever_status = self._get_retriever_status()
-        evidence_map: Dict[str, Dict] = {}
+    def _load_analysis_sources(self) -> tuple[List[Dict], List[Dict]]:
+        return self.knowledge_repo.find_all(), self.fix_repo.find_all()
 
-        if not is_clean:
-            # 5. Repository에서 데이터 조회
-            knowledge_data = self.knowledge_repo.find_all()
-            fix_data = self.fix_repo.find_all()
-            evidence_map = self.evidence_retriever.retrieve(
-                integrated_scan_result,
-                knowledge_data,
-                fix_data,
+    def _build_analysis_inputs(
+        self,
+        file_path: str,
+        scan_result: ScanResult,
+        knowledge_data: List[Dict],
+        fix_data: List[Dict],
+    ) -> tuple[Dict[str, Dict], Dict[str, Dict], Dict[str, Dict]]:
+        evidence_map = self.evidence_retriever.retrieve(
+            scan_result,
+            knowledge_data,
+            fix_data,
+        )
+        verification_map = self._build_verification_map(
+            default_file_path=file_path,
+            findings=scan_result.findings,
+        )
+        analysis_context_map = self._build_analysis_context_map(
+            evidence_map=evidence_map,
+            verification_map=verification_map,
+        )
+        return evidence_map, verification_map, analysis_context_map
+
+    def _run_analyzer(
+        self,
+        scan_result: ScanResult,
+        knowledge_data: List[Dict],
+        fix_data: List[Dict],
+        analysis_context_map: Dict[str, Dict],
+    ) -> List[FixSuggestion]:
+        return self.analyzer.analyze(
+            scan_result,
+            knowledge_data,
+            fix_data,
+            analysis_context_map,
+        )
+
+    def _save_analysis_failure_logs(
+        self,
+        file_path: str,
+        findings: List[Vulnerability],
+        evidence_map: Dict[str, Dict],
+        verification_map: Dict[str, Dict],
+        analysis_error: str,
+    ) -> None:
+        for finding in findings:
+            evidence_context = self._build_evidence_context(file_path, finding, evidence_map)
+            verification_context = self._build_verification_context(file_path, finding, verification_map)
+            self.log_repo.save(
+                self._build_analysis_failure_log(
+                    default_file_path=file_path,
+                    finding=finding,
+                    evidence_context=evidence_context,
+                    verification_context=verification_context,
+                    error_message=analysis_error,
+                )
             )
-            verification_map = self._build_verification_map(
+
+    def _normalize_and_save_suggestions(
+        self,
+        file_path: str,
+        findings: List[Vulnerability],
+        raw_suggestions: List[FixSuggestion],
+        evidence_map: Dict[str, Dict],
+        verification_map: Dict[str, Dict],
+    ) -> List[FixSuggestion]:
+        normalized_suggestions: List[FixSuggestion] = []
+
+        for suggestion in raw_suggestions:
+            matching_vuln = self._find_matching_vulnerability(
+                file_path=file_path,
+                findings=findings,
+                suggestion=suggestion,
+            )
+            if not matching_vuln:
+                normalized_suggestions.append(suggestion)
+                continue
+
+            normalized_suggestion = self._normalize_suggestion(
                 default_file_path=file_path,
-                findings=unique_findings,
-            )
-            analysis_context_map = self._build_analysis_context_map(
+                finding=matching_vuln,
+                suggestion=suggestion,
                 evidence_map=evidence_map,
                 verification_map=verification_map,
             )
+            self.log_repo.save(self._build_log_data(matching_vuln, normalized_suggestion))
+            normalized_suggestions.append(normalized_suggestion)
 
-            # 6. Analyzer 실행 (L2)
-            fix_suggestions = self.analyzer.analyze(
-                integrated_scan_result,
-                knowledge_data,
-                fix_data,
-                analysis_context_map,
-            )
-            analysis_error = getattr(self.analyzer, "last_error", None)
+        return normalized_suggestions
 
-            # 7. LogRepo 저장
-            if analysis_error:
-                for finding in unique_findings:
-                    evidence_context = self._build_evidence_context(file_path, finding, evidence_map)
-                    verification_context = self._build_verification_context(file_path, finding, verification_map)
-                    self.log_repo.save(
-                        self._build_analysis_failure_log(
-                            default_file_path=file_path,
-                            finding=finding,
-                            evidence_context=evidence_context,
-                            verification_context=verification_context,
-                            error_message=analysis_error,
-                        )
-                    )
-            else:
-                for suggestion in fix_suggestions:
-                    matching_vuln = self._find_matching_vulnerability(
-                        file_path=file_path,
-                        findings=unique_findings,
-                        suggestion=suggestion,
-                    )
-                    
-                    if matching_vuln:
-                        finding_file_path = self._resolve_finding_file_path(matching_vuln, file_path)
-                        evidence_context = self._build_evidence_context(file_path, matching_vuln, evidence_map)
-                        verification_context = self._build_verification_context(
-                            file_path,
-                            matching_vuln,
-                            verification_map,
-                        )
-                        patch_context = self.patch_builder.build(matching_vuln, suggestion)
-                        category = self._classify_category(matching_vuln.cwe_id)
-                        remediation_kind = self._build_remediation_kind(category, patch_context)
-                        target_ref = self._build_target_ref(finding_file_path, matching_vuln, category)
-                        processing_trace = self._build_processing_trace(
-                            evidence_context=evidence_context,
-                            verification_context=verification_context,
-                            patch_context=patch_context,
-                            analysis_failed=False,
-                        )
-                        analysis_context = {
-                            **evidence_context,
-                            **verification_context,
-                        }
-                        # hyeonexcel 수정: analyzer가 필드를 비워도 pipeline 단계에서
-                        # 최종 decision/confidence 메타데이터를 일관되게 보정해서 남긴다.
-                        decision_status, confidence_score, confidence_reason = build_decision_metadata(
-                            matching_vuln.cwe_id,
-                            analysis_context,
-                            decision_status=suggestion.decision_status,
-                            confidence_score=suggestion.confidence_score,
-                            confidence_reason=suggestion.confidence_reason,
-                        )
-                        canonical_issue_id = self._build_issue_id(
-                            finding_file_path,
-                            matching_vuln.cwe_id,
-                            matching_vuln.line_number,
-                        )
-                        normalized_suggestion = suggestion.model_copy(
-                            update={
-                                "issue_id": canonical_issue_id,
-                                "file_path": finding_file_path,
-                                "cwe_id": matching_vuln.cwe_id,
-                                "line_number": matching_vuln.line_number,
-                                "evidence_refs": suggestion.evidence_refs or evidence_context.get("evidence_refs", []),
-                                "evidence_summary": suggestion.evidence_summary or evidence_context.get("evidence_summary"),
-                                "retrieval_backend": suggestion.retrieval_backend or evidence_context.get("retrieval_backend"),
-                                "chroma_status": suggestion.chroma_status or evidence_context.get("chroma_status"),
-                                "chroma_summary": suggestion.chroma_summary or evidence_context.get("chroma_summary"),
-                                "chroma_hits": max(suggestion.chroma_hits, evidence_context.get("chroma_hits", 0)),
-                                "kisa_reference": suggestion.kisa_reference or evidence_context.get("primary_reference"),
-                                "registry_status": suggestion.registry_status or verification_context.get("registry_status"),
-                                "registry_summary": suggestion.registry_summary or verification_context.get("registry_summary"),
-                                "osv_status": suggestion.osv_status or verification_context.get("osv_status"),
-                                "osv_summary": suggestion.osv_summary or verification_context.get("osv_summary"),
-                                "verification_summary": (
-                                    suggestion.verification_summary
-                                    or verification_context.get("verification_summary")
-                                ),
-                                "decision_status": decision_status,
-                                "confidence_score": confidence_score,
-                                "confidence_reason": confidence_reason,
-                                "patch_status": suggestion.patch_status or patch_context.get("patch_status"),
-                                "patch_summary": suggestion.patch_summary or patch_context.get("patch_summary"),
-                                "patch_diff": suggestion.patch_diff or patch_context.get("patch_diff"),
-                                "processing_trace": suggestion.processing_trace or processing_trace,
-                                "processing_summary": suggestion.processing_summary or self._summarize_trace(processing_trace),
-                                "category": suggestion.category or category,
-                                "remediation_kind": suggestion.remediation_kind or remediation_kind,
-                                "target_ref": suggestion.target_ref or target_ref,
-                            }
-                        )
-                        log_data = {
-                            "issue_id": normalized_suggestion.issue_id,
-                            "file_path": finding_file_path,
-                            "cwe_id": matching_vuln.cwe_id,
-                            "severity": matching_vuln.severity,
-                            "line_number": matching_vuln.line_number,
-                            "code_snippet": matching_vuln.code_snippet,
-                            "original_code": normalized_suggestion.original_code or matching_vuln.code_snippet,
-                            "fixed_code": normalized_suggestion.fixed_code,
-                            "description": normalized_suggestion.description,
-                            "reachability": normalized_suggestion.reachability,
-                            "kisa_reference": normalized_suggestion.kisa_reference,
-                            "evidence_refs": normalized_suggestion.evidence_refs,
-                            "evidence_summary": normalized_suggestion.evidence_summary,
-                            "retrieval_backend": normalized_suggestion.retrieval_backend,
-                            "chroma_status": normalized_suggestion.chroma_status,
-                            "chroma_summary": normalized_suggestion.chroma_summary,
-                            "chroma_hits": normalized_suggestion.chroma_hits,
-                            "registry_status": normalized_suggestion.registry_status,
-                            "registry_summary": normalized_suggestion.registry_summary,
-                            "osv_status": normalized_suggestion.osv_status,
-                            "osv_summary": normalized_suggestion.osv_summary,
-                            "verification_summary": normalized_suggestion.verification_summary,
-                            "decision_status": normalized_suggestion.decision_status,
-                            "confidence_score": normalized_suggestion.confidence_score,
-                            "confidence_reason": normalized_suggestion.confidence_reason,
-                            "patch_status": normalized_suggestion.patch_status,
-                            "patch_summary": normalized_suggestion.patch_summary,
-                            "patch_diff": normalized_suggestion.patch_diff,
-                            "processing_trace": normalized_suggestion.processing_trace,
-                            "processing_summary": normalized_suggestion.processing_summary,
-                            "category": normalized_suggestion.category,
-                            "remediation_kind": normalized_suggestion.remediation_kind,
-                            "target_ref": normalized_suggestion.target_ref,
-                            "status": "pending"
-                        }
-                        suggestion.issue_id = normalized_suggestion.issue_id
-                        suggestion.file_path = normalized_suggestion.file_path
-                        suggestion.cwe_id = normalized_suggestion.cwe_id
-                        suggestion.line_number = normalized_suggestion.line_number
-                        suggestion.evidence_refs = normalized_suggestion.evidence_refs
-                        suggestion.evidence_summary = normalized_suggestion.evidence_summary
-                        suggestion.retrieval_backend = normalized_suggestion.retrieval_backend
-                        suggestion.chroma_status = normalized_suggestion.chroma_status
-                        suggestion.chroma_summary = normalized_suggestion.chroma_summary
-                        suggestion.chroma_hits = normalized_suggestion.chroma_hits
-                        suggestion.kisa_reference = normalized_suggestion.kisa_reference
-                        suggestion.registry_status = normalized_suggestion.registry_status
-                        suggestion.registry_summary = normalized_suggestion.registry_summary
-                        suggestion.osv_status = normalized_suggestion.osv_status
-                        suggestion.osv_summary = normalized_suggestion.osv_summary
-                        suggestion.verification_summary = normalized_suggestion.verification_summary
-                        suggestion.decision_status = normalized_suggestion.decision_status
-                        suggestion.confidence_score = normalized_suggestion.confidence_score
-                        suggestion.confidence_reason = normalized_suggestion.confidence_reason
-                        suggestion.patch_status = normalized_suggestion.patch_status
-                        suggestion.patch_summary = normalized_suggestion.patch_summary
-                        suggestion.patch_diff = normalized_suggestion.patch_diff
-                        suggestion.processing_trace = normalized_suggestion.processing_trace
-                        suggestion.processing_summary = normalized_suggestion.processing_summary
-                        suggestion.category = normalized_suggestion.category
-                        suggestion.remediation_kind = normalized_suggestion.remediation_kind
-                        suggestion.target_ref = normalized_suggestion.target_ref
-                        self.log_repo.save(log_data)
+    def _normalize_suggestion(
+        self,
+        default_file_path: str,
+        finding: Vulnerability,
+        suggestion: FixSuggestion,
+        evidence_map: Dict[str, Dict],
+        verification_map: Dict[str, Dict],
+    ) -> FixSuggestion:
+        finding_file_path = self._resolve_finding_file_path(finding, default_file_path)
+        evidence_context = self._build_evidence_context(default_file_path, finding, evidence_map)
+        verification_context = self._build_verification_context(default_file_path, finding, verification_map)
+        patch_context = self.patch_builder.build(finding, suggestion)
+        category = self._classify_category(finding.cwe_id)
+        remediation_kind = self._build_remediation_kind(category, patch_context)
+        target_ref = self._build_target_ref(finding_file_path, finding, category)
+        processing_trace = self._build_processing_trace(
+            evidence_context=evidence_context,
+            verification_context=verification_context,
+            patch_context=patch_context,
+            analysis_failed=False,
+        )
+        analysis_context = {
+            **evidence_context,
+            **verification_context,
+        }
+        # hyeonexcel 수정: analyzer가 필드를 비워도 pipeline 단계에서
+        # 최종 decision/confidence 메타데이터를 일관되게 보정해서 남긴다.
+        decision_status, confidence_score, confidence_reason = build_decision_metadata(
+            finding.cwe_id,
+            analysis_context,
+            decision_status=suggestion.decision_status,
+            confidence_score=suggestion.confidence_score,
+            confidence_reason=suggestion.confidence_reason,
+        )
+        canonical_issue_id = self._build_issue_id(
+            finding_file_path,
+            finding.cwe_id,
+            finding.line_number,
+        )
 
-        # 8. 결과 dict로 변환 (Pydantic model_dump 사용)
+        return suggestion.model_copy(
+            update={
+                "issue_id": canonical_issue_id,
+                "file_path": finding_file_path,
+                "cwe_id": finding.cwe_id,
+                "line_number": finding.line_number,
+                "evidence_refs": suggestion.evidence_refs or evidence_context.get("evidence_refs", []),
+                "evidence_summary": suggestion.evidence_summary or evidence_context.get("evidence_summary"),
+                "retrieval_backend": suggestion.retrieval_backend or evidence_context.get("retrieval_backend"),
+                "chroma_status": suggestion.chroma_status or evidence_context.get("chroma_status"),
+                "chroma_summary": suggestion.chroma_summary or evidence_context.get("chroma_summary"),
+                "chroma_hits": max(suggestion.chroma_hits, evidence_context.get("chroma_hits", 0)),
+                "kisa_reference": suggestion.kisa_reference or evidence_context.get("primary_reference"),
+                "registry_status": suggestion.registry_status or verification_context.get("registry_status"),
+                "registry_summary": suggestion.registry_summary or verification_context.get("registry_summary"),
+                "osv_status": suggestion.osv_status or verification_context.get("osv_status"),
+                "osv_summary": suggestion.osv_summary or verification_context.get("osv_summary"),
+                "verification_summary": (
+                    suggestion.verification_summary
+                    or verification_context.get("verification_summary")
+                ),
+                "decision_status": decision_status,
+                "confidence_score": confidence_score,
+                "confidence_reason": confidence_reason,
+                "patch_status": suggestion.patch_status or patch_context.get("patch_status"),
+                "patch_summary": suggestion.patch_summary or patch_context.get("patch_summary"),
+                "patch_diff": suggestion.patch_diff or patch_context.get("patch_diff"),
+                "processing_trace": suggestion.processing_trace or processing_trace,
+                "processing_summary": suggestion.processing_summary or self._summarize_trace(processing_trace),
+                "category": suggestion.category or category,
+                "remediation_kind": suggestion.remediation_kind or remediation_kind,
+                "target_ref": suggestion.target_ref or target_ref,
+            }
+        )
+
+    @staticmethod
+    def _build_log_data(finding: Vulnerability, suggestion: FixSuggestion) -> dict:
+        return {
+            "issue_id": suggestion.issue_id,
+            "file_path": suggestion.file_path,
+            "cwe_id": finding.cwe_id,
+            "severity": finding.severity,
+            "line_number": finding.line_number,
+            "code_snippet": finding.code_snippet,
+            "original_code": suggestion.original_code or finding.code_snippet,
+            "fixed_code": suggestion.fixed_code,
+            "description": suggestion.description,
+            "reachability": suggestion.reachability,
+            "kisa_reference": suggestion.kisa_reference,
+            "evidence_refs": suggestion.evidence_refs,
+            "evidence_summary": suggestion.evidence_summary,
+            "retrieval_backend": suggestion.retrieval_backend,
+            "chroma_status": suggestion.chroma_status,
+            "chroma_summary": suggestion.chroma_summary,
+            "chroma_hits": suggestion.chroma_hits,
+            "registry_status": suggestion.registry_status,
+            "registry_summary": suggestion.registry_summary,
+            "osv_status": suggestion.osv_status,
+            "osv_summary": suggestion.osv_summary,
+            "verification_summary": suggestion.verification_summary,
+            "decision_status": suggestion.decision_status,
+            "confidence_score": suggestion.confidence_score,
+            "confidence_reason": suggestion.confidence_reason,
+            "patch_status": suggestion.patch_status,
+            "patch_summary": suggestion.patch_summary,
+            "patch_diff": suggestion.patch_diff,
+            "processing_trace": suggestion.processing_trace,
+            "processing_summary": suggestion.processing_summary,
+            "category": suggestion.category,
+            "remediation_kind": suggestion.remediation_kind,
+            "target_ref": suggestion.target_ref,
+            "status": "pending",
+        }
+
+    def _build_run_result(
+        self,
+        file_path: str,
+        findings: List[Vulnerability],
+        fix_suggestions: List[FixSuggestion],
+        is_clean: bool,
+        retriever_status: Dict[str, str],
+    ) -> dict:
         return {
             "file_path": file_path,
-            "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
+            "scan_results": [v.model_dump() for v in findings],
             "fix_suggestions": [f.model_dump() for f in fix_suggestions],
             "is_clean": is_clean,
             "summary": self._build_run_summary(
-                integrated_scan_result.findings,
+                findings,
                 fix_suggestions,
                 retriever_status,
             ),

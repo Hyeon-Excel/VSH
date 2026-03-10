@@ -275,3 +275,46 @@ def test_chroma_retriever_prioritizes_nvd_for_supply_chain():
 
     assert merged[0]["source"] == "NVD"
     assert merged[1]["source"] == "KISA"
+
+
+def test_chroma_retriever_uses_exact_metadata_before_query_embeddings():
+    class QueryFailCollection:
+        def count(self):
+            return 2
+
+        def get(self, where=None, limit=10, include=None):
+            if where:
+                return {
+                    "documents": [
+                        "파라미터 바인딩으로 SQL Injection을 방지합니다.",
+                        "Injection 취약점은 입력값 검증이 필요합니다.",
+                    ],
+                    "metadatas": [
+                        {
+                            "source": "KISA",
+                            "cwe": "CWE-89",
+                            "kisa_article": "입력데이터 검증 및 표현 1항",
+                            "title": "SQL 삽입",
+                        },
+                        {
+                            "source": "OWASP",
+                            "cwe": "CWE-89",
+                            "owasp_id": "A03:2021",
+                            "title": "Injection",
+                        },
+                    ],
+                }
+            return {"documents": [], "metadatas": []}
+
+        def query(self, *args, **kwargs):
+            raise AssertionError("exact metadata match should bypass semantic query")
+
+    retriever = ChromaRetriever.__new__(ChromaRetriever)
+    retriever._ready = True
+    retriever._collection = QueryFailCollection()
+
+    docs = retriever.query_related("CWE-89", "cursor.execute(query % user_input)", n_results=2)
+
+    assert len(docs) == 2
+    assert docs[0]["source"] == "KISA"
+    assert docs[1]["source"] == "OWASP"

@@ -41,7 +41,7 @@ main
 - `v0.5.x`: patch 및 integration
 - `v1.0.0`: `layer2 -> main` 머지 검토 가능한 안정 상태
 
-현재 작업 버전은 `v0.10.0-dev`로 본다.
+현재 작업 버전은 `v0.11.0-dev`로 본다.
 
 ## 5. 히스토리 기록 규칙
 
@@ -75,7 +75,7 @@ main
 | 2026-03-09 | v0.5.0 | committed | `657b566` | patch builder 구현 | `PatchBuilder` 추가, verifier 이후 patch preview 생성, response/log/dashboard에 patch diff 반영, patch 테스트 추가 | `pytest tests/test_l2_patch_builder.py tests/test_l2_verifiers.py tests/test_l2_retriever.py tests/test_mock_analyzer.py tests/test_l2_contracts.py -q` -> `16 passed`, `pytest tests/test_e2e.py -q` -> `3 passed, 1 skipped` |
 | 2026-03-10 | v0.8.2 | committed | `25d0f9e` | MCP 인터페이스 계약 정렬 | `tools/server.py`를 문서 계약 기준 `validate_code`, `scan_only`, `get_results`, `apply_fix`, `dismiss_issue`, `get_log` 형태로 정리하고, 기존 이름은 레거시 wrapper로 유지 | `cd VSH_Project_MVP && python -m pytest tests/test_mcp_server_contract.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_l2_retriever.py tests/test_l2_verifiers.py tests/test_l2_patch_builder.py tests/test_e2e.py -q` -> `29 passed, 1 skipped` |
 | 2026-03-10 | v0.9.0 | committed | `3dc9b3d` | L2 판단 신뢰도 가시화 | `decision_status`, `confidence_score`, `confidence_reason`을 analyzer/pipeline/UI에 통합하고, run summary에 confidence 집계를 추가해 L2 판단 결과를 더 구조화 | `cd VSH_Project_MVP && python -m pytest tests/test_mcp_server_contract.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_l2_retriever.py tests/test_l2_verifiers.py tests/test_l2_patch_builder.py tests/test_e2e.py -q` -> `29 passed, 1 skipped` |
-| 2026-03-10 | v0.10.0-dev | working tree | `uncommitted` | 계층 구조 재정리 | 실제 구현을 `shared/`, `layer1/`, `layer2/`, `orchestration/`, `interfaces/` 기준으로 재배치하고, `modules/`, `pipeline/`, `tools/`는 호환 wrapper로 유지 | `cd VSH_Project_MVP && python -m pytest tests/test_mcp_server_contract.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_l2_retriever.py tests/test_l2_verifiers.py tests/test_l2_patch_builder.py tests/test_e2e.py -q` -> `30 passed, 1 skipped` |
+| 2026-03-10 | v0.11.0-dev | working tree | `uncommitted` | L2 내부 리팩토링, Gemini SDK 전환, Chroma 활성 검증 | `analysis_pipeline.py`를 helper 중심으로 분리하고, Gemini/Claude analyzer 공통 베이스를 추출했으며, `GeminiAnalyzer`를 `google.genai` 기준으로 마이그레이션했다. 또한 ChromaRetriever를 exact metadata 우선 구조로 보강해 로컬 활성 환경에서 실제 Chroma hit가 파이프라인에 반영되도록 정리했다. | `cd VSH_Project_MVP && python -m pytest tests/test_l2_retriever.py tests/test_l2_llm_analyzer_base.py tests/test_mcp_server_contract.py tests/test_mock_analyzer.py tests/test_l2_contracts.py tests/test_l2_verifiers.py tests/test_l2_patch_builder.py tests/test_e2e.py -q` -> `33 passed, 1 skipped` |
 
 ## 7. 다음 버전 목표
 
@@ -83,10 +83,9 @@ main
 
 범위:
 
-- Analyzer 공통 베이스 추출
-- `google.generativeai` -> `google.genai` 마이그레이션
-- Chroma 활성 환경 기준 end-to-end 검증
 - L3 handoff 응답 계약 최종 정리
+- language 하드코딩 제거 및 다중 언어 입력 경계 정리
+- analyzer/provider 오류를 더 명시적인 결과 계약으로 정리
 
 ## 8. 문서 유지 방법
 

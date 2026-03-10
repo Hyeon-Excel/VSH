@@ -204,15 +204,17 @@ class EvidenceRetriever:
         if knowledge_entry.get("reference"):
             return knowledge_entry["reference"]
 
-        chroma_reference = self._build_primary_chroma_reference(chroma_docs)
-        if chroma_reference:
-            return chroma_reference
-
         if cwe_id == "CWE-829":
             package_name, _ = self._parse_requirement(code_snippet)
             vuln_info = VULNERABLE_PACKAGES.get(package_name or "", {})
             if vuln_info.get("cve"):
                 return vuln_info["cve"]
+
+        # hyeonexcel 수정: 공급망 finding은 내부 deterministic CVE 기준을 먼저 유지하고
+        # 그 외 코드 취약점은 Chroma 상위 문서를 primary reference로 사용한다.
+        chroma_reference = self._build_primary_chroma_reference(chroma_docs)
+        if chroma_reference:
+            return chroma_reference
 
         return None
 
