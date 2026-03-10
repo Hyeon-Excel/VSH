@@ -1,8 +1,8 @@
-import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from .chroma_retriever import ChromaRetriever
+from layer2.common.requirement_parser import parse_requirement_line
 from models.scan_result import ScanResult
 
 try:
@@ -293,10 +293,7 @@ class EvidenceRetriever:
 
     @staticmethod
     def _parse_requirement(requirement_line: str) -> tuple[str | None, str | None]:
-        match = re.match(r"^([a-zA-Z0-9_\\-]+)(?:[=!<>~]+([0-9\\.]+))?", requirement_line.strip())
-        if not match:
-            return None, None
-        return match.group(1).lower(), match.group(2)
+        return parse_requirement_line(requirement_line)
 
     @staticmethod
     def _build_issue_id(file_path: str, cwe_id: str, line_number: int) -> str:

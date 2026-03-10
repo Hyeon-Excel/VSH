@@ -1,28 +1,30 @@
 # L2 Architecture
 
-## 1. 목표 아키텍처
+## 1. 현재 목표 아키텍처
 
 ```text
 L1 findings
-  -> L2Service
+  -> AnalysisPipeline
       -> EvidenceRetriever
       -> RegistryVerifier
       -> OsvVerifier
+      -> Analyzer (Mock / Gemini / Claude)
       -> PatchBuilder
-      -> L2EnrichFixResponse
+      -> FixSuggestion / Log / MCP / Dashboard
 ```
 
 ## 2. 세부 컴포넌트 책임
 
-### `L2Service`
+### `AnalysisPipeline`
 
-L2 전체 오케스트레이션 담당.
+현재 L2 전체 오케스트레이션 담당.
 
 - request 수신
 - finding 분류
 - enrichment 실행
 - verification 실행
 - patch 생성 호출
+- log 저장
 - response 조립
 - 오류 수집 및 반환
 
@@ -106,34 +108,43 @@ L2는 fail-soft 원칙을 따른다.
 
 하위 컴포넌트가 실패해도 response는 가능한 한 반환해야 한다.
 
-## 4. 파일 구조 제안
+## 4. 현재 파일 구조 기준
 
 ```text
-src/vsh/
-  common/
+VSH_Project_MVP/
+  layer2/
     __init__.py
-    models.py
-  l2_warm/
-    __init__.py
-    service.py
+    common/
+      __init__.py
+      requirement_parser.py
+    analyzer/
+      __init__.py
+      analyzer_factory.py
+      mock_analyzer.py
+      gemini_analyzer.py
+      claude_analyzer.py
+      confidence_support.py
     patch_builder.py
-    rag/
+    retriever/
       __init__.py
-      retriever.py
-      sources.py
-    verification/
+      evidence_retriever.py
+      chroma_retriever.py
+    verifier/
       __init__.py
-      base.py
-      registry.py
-      osv.py
-tests/
-  test_l2_service.py
+      registry_verifier.py
+      osv_verifier.py
+  pipeline/
+    analysis_pipeline.py
+    pipeline_factory.py
+  models/
+    fix_suggestion.py
+  tests/
   test_l2_retriever.py
-  test_l2_registry.py
-  test_l2_osv.py
-  fixtures/
-    l2/
+  test_l2_verifiers.py
+  test_l2_patch_builder.py
+  test_mock_analyzer.py
+  test_e2e.py
 ```
 
-초기 구현에서는 `sources.py`, `base.py`, `patch_builder.py`를 단순화할 수 있다.
-다만 확장성을 고려하면 파일 경계는 일찍 잡는 편이 좋다.
+향후 `L2Service` 같은 별도 오케스트레이션 클래스로 재분리할 수는 있지만,
+현재 구현과 테스트 기준선은 위 구조를 따른다.
