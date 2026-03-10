@@ -1,6 +1,17 @@
+# Intentional vulnerable dependency for SBOM demo coverage
 requests==2.9.0
-flask==2.10.0
-google-generativeai
+
+anthropic
+chromadb
+fastapi
+fastmcp
+google-genai
 jinja2
-python-multipart
+packaging
+pydantic>=2,<3
 pytest
+python-dotenv
+python-multipart
+tree-sitter
+tree-sitter-python
+uvicorn

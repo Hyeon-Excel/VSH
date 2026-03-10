@@ -2,40 +2,52 @@
 
 ## 레이어 구조 및 역할
 
-### Interface Layer (tools/)
-MCP 툴 등록과 위임만 담당. 비즈니스 로직 없음.
-Claude가 호출하는 진입점. pipeline_factory를 통해 파이프라인을 받아 실행만 함.
+### Interface Layer (`interfaces/`, `dashboard/`)
+- `interfaces/mcp/server.py`
+  - MCP 툴 계약을 외부에 공개하는 진입점
+- `dashboard/`
+  - FastAPI 대시보드와 UI 표시 담당
 
-### Orchestration Layer (pipeline/)
-L1 → L2 흐름 제어.
-어떤 스캐너를 어떤 순서로 실행할지 결정.
-L1 결과 없으면 clean 처리, 있으면 L2로 위임.
-구체적인 실행은 modules/에 위임.
+### Orchestration Layer (`orchestration/`)
+- L1 → L2 흐름 제어
+- 어떤 스캐너를 어떤 순서로 실행할지 결정
+- retrieval / verification / analysis / patch를 조립
+- L3가 붙을 경우 이 레이어가 handoff 지점이 됨
 
-### Execution Layer (modules/)
-실제 Semgrep 실행, Tree-sitter AST 파싱, Claude API 호출.
-supported_languages()로 언어별 지원 여부 추상화.
-새 언어 추가 시 기존 코드 수정 없이 구현체만 추가.
+### Shared Contract Layer (`shared/`)
+- `BaseScanner`, `BaseAnalyzer` 같은 공통 추상 계약 보관
+- L1 / L2 / 향후 L3가 같은 인터페이스 기준을 공유
 
-### Data Layer (repository/)
-JSON Mock → 실제 Vector DB 교체 시 이 레이어만 변경.
-상위 레이어는 변경 없음.
+### Layer 1 (`layer1/`)
+- scanner 구현체 보관
+- mock semgrep, tree-sitter, SBOM 같은 탐지 컴포넌트 담당
 
-### Domain Model (models/)
-레이어 간 데이터 전달에 사용되는 데이터 구조.
-모든 레이어가 이 모델을 기준으로 통신.
+### Layer 2 (`layer2/`)
+- analyzer / retriever / verifier / patch builder 보관
+- L1 findings를 보강, 검증, 수정 제안으로 연결
+
+### Data Layer (`repository/`)
+- JSON Mock → 실제 Vector DB 교체 시 이 레이어만 변경
+- 상위 레이어는 repository 추상에만 의존
+
+### Domain Model (`models/`)
+- 레이어 간 데이터 전달에 사용되는 데이터 구조
+- 모든 레이어가 이 모델을 기준으로 통신
+
+### Compatibility Layer (`modules/`, `pipeline/`, `tools/`)
+- 기존 경로를 쓰는 코드가 깨지지 않도록 wrapper 유지
+- 실제 구현은 새 패키지(`shared/`, `layer1/`, `orchestration/`, `interfaces/`)를 사용
 
 ---
 
 ## 의존성 흐름
 
-tools/
-  └→ pipeline_factory
-       └→ analysis_pipeline
-            ├→ scanner/* (L1)
-            ├→ analyzer/* (L2)
-            └→ repository/*
-                 └→ mock_db/ (JSON)
+interfaces/mcp
+  └→ orchestration
+       ├→ layer1/scanner/* (L1)
+       ├→ layer2/* (L2)
+       ├→ repository/*
+       └→ models/*
 
 모든 의존성은 위에서 아래로만 흐른다. 역방향 없음.
 
@@ -43,11 +55,11 @@ tools/
 
 ## 추상화 포인트
 
-| 추상 클래스 | MVP 구현체 | 확장 가능 구현체 |
+| 추상 클래스 | 현재 구현체 | 확장 가능 구현체 |
 |------------|-----------|----------------|
-| BaseScanner | SemgrepScanner, TreeSitterScanner, SBOMScanner | SonarQubeScanner |
-| BaseAnalyzer | LLMAnalyzer | RuleBasedAnalyzer |
-| BaseRepository | MockKnowledgeRepo, MockFixRepo, MockLogRepo | ChromaRepo |
+| BaseScanner | MockSemgrepScanner, TreeSitterScanner, SBOMScanner | SemgrepScanner, SonarQubeScanner |
+| BaseAnalyzer | MockAnalyzer, GeminiAnalyzer, ClaudeAnalyzer | RuleBasedAnalyzer |
+| BaseReadRepository / BaseWriteRepository | MockKnowledgeRepo, MockFixRepo, MockLogRepo | ChromaRepo, SQLiteRepo |
 | BasePipeline | AnalysisPipeline | FastPipeline, DeepPipeline |
 
 ---
@@ -55,7 +67,7 @@ tools/
 ## Mock DB → 실제 DB 교체 전략
 
 repository/ 레이어만 교체하면 됨.
-상위 레이어(pipeline/, tools/)는 BaseRepository 추상에만 의존하기 때문에
+상위 레이어(orchestration/, interfaces/)는 BaseRepository 추상에만 의존하기 때문에
 구현체가 MockRepo든 ChromaRepo든 알 필요 없음.
 
 교체 예시:
@@ -66,16 +78,16 @@ repository/ 레이어만 교체하면 됨.
 
 ## 설계 결정 사항 및 이유
 
-1. 기능 단위 + 레이어 단위 혼합 채택
-   이유: MCP 툴은 Claude가 목적 기준으로 호출하므로 인터페이스는 기능 단위,
-         내부 구현은 레이어 단위로 관리하는 것이 유지보수에 유리
+1. 레이어 경계 명시화 채택
+   이유: L1 / L2 / Interface / Orchestration이 섞여 보이면
+         다른 팀원이 실제 L1 또는 향후 L3 구현을 붙일 때 진입점을 찾기 어렵기 때문
 
 2. Repository 패턴 채택
    이유: MVP에서 Mock JSON을 쓰지만 나중에 실제 DB로 교체할 때
          상위 레이어 코드를 건드리지 않기 위함
 
 3. 의존성 주입 채택
-   이유: Pipeline이 Scanner를 직접 생성하지 않고 Factory에서 조립하여 주입.
+   이유: Orchestration이 Scanner를 직접 생성하지 않고 Factory에서 조립하여 주입.
          테스트 용이성 및 구현체 교체 유연성 확보
 
 4. Tree-sitter supported_languages() 추상화

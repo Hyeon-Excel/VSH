@@ -1,6 +1,6 @@
 # PROGRESS.md — 개발 진행 상태
 
-## 현재 단계: 프로젝트 완료 (Post-MVP 준비)
+## 현재 단계: mock 기반 MVP 골격 완료 (Post-MVP 준비)
 
 ---
 
@@ -14,9 +14,9 @@
 | 3 | Scanner (L1) | 완료 | 260225 |
 | 4 | Analyzer (L2) | 완료 | 260225 |
 | 5 | Pipeline | 완료 | 260225 |
-| 6 | MCP 툴 등록 | 완료 | 260225 |
-| 7 | Dashboard | 완료 | 260225 |
-| 8 | E2E 테스트 | 완료 | 260225 |
+| 6 | MCP 툴 등록 | 완료 | 260226 |
+| 7 | Dashboard | 완료 | 260226 |
+| 8 | E2E 테스트 | 완료 | 260226 |
 
 ---
 
@@ -54,10 +54,10 @@
 - [x] PipelineFactory 인스턴스 생성 확인
 
 ### Step 6 — MCP 툴 등록
-- [x] mcp_server.py 실행 오류 없음 (Fail Fast 적용)
-- [x] scan_file 툴 호출 → 파이프라인 실행 확인
-- [x] get_report 툴 호출 → log.json 반환 확인
-- [x] update_status 툴 호출 → 상태 변경 및 검증 확인
+- [x] `interfaces/mcp/server.py` 실행 오류 없음 (Fail Fast 적용)
+- [x] `validate_code` 호출 → 파이프라인 실행 확인
+- [x] `get_results` 호출 → `log.json` 반환 확인
+- [x] `apply_fix` / `dismiss_issue` 호출 → 상태 변경 및 검증 확인
 
 ### Step 7 — Dashboard
 - [x] localhost:3000 접속 확인
@@ -76,21 +76,23 @@
 
 | 날짜 | 내용 |
 |------|------|
-| 250225 | 아키텍처 설계 확정 (기능+레이어 혼합, OOP 원칙 적용) |
-| 250225 | MVP 지원 언어: Python (Tree-sitter) |
-| 250225 | 대시보드 포트: 3000 |
-| 250225 | 프로젝트 루트: VSH_Project_MVP |
+| 260225 | 아키텍처 설계 확정 (기능+레이어 혼합, OOP 원칙 적용) |
+| 260225 | MVP 지원 언어: Python (Tree-sitter) |
+| 260225 | 대시보드 포트: 3000 |
+| 260225 | 프로젝트 루트: VSH_Project_MVP |
 | 260225 | Step 0 완료: 프로젝트 구조 세팅, 의존성 설치, 레이어별 __init__.py 및 클래스 스켈레톤 작성 |
 | 260225 | Step 1 완료: Domain Model 구현 (Pydantic 채택 - 데이터 검증 및 직렬화 용이성) |
 | 260225 | Step 2 완료: Repository Layer 구현 및 Mock DB 연동 |
 | 260225 | Step 3 완료: L1 Scanner 구현 완료 (Semgrep, Tree-sitter, SBOM) |
 | 260225 | Step 4 완료: Analyzer (L2) 구현 및 API 연동 (Gemini API 채택) |
 | 260225 | Step 5 완료: Pipeline Layer 구현 (Orchestration 흐름 완성) |
-| 260225 | Step 6 완료: MCP 툴 등록 및 Interface Layer 구현 |
-| 260225 | Step 7 완료: Dashboard Layer 구현 및 사전 작업 완료 |
-| 260225 | Step 8 완료: 전체 시스템 E2E 테스트 및 자동화 검증 완료 |
+| 260226 | Step 6 완료: MCP 툴 등록 및 Interface Layer 구현 |
+| 260226 | Step 7 완료: Dashboard Layer 구현 및 사전 작업 완료 |
+| 260226 | Step 8 완료: 전체 시스템 E2E 테스트 및 자동화 검증 완료 |
 | 260225 | [결정] E2E 테스트 격리: `tests/e2e_target.py`, `tests/e2e_target_fixed.py` 전용 파일 사용 |
 | 260225 | [결정] 테스트 검증 방식: 수동 UI 확인(UX) + `pytest` 자동 스크립트(API/데이터) 병행 |
 | 260225 | [이슈] CWE-89 패턴 오탐: `knowledge.json` 정규식이 안전한 바인딩 코드도 매칭. 코드 분리(SQL 분리)로 해결 |
-| 260225 | [Post-MVP] google.generativeai → `google.genai` 마이그레이션 (현재 패키지 지원 종료 상태) |
+| 260225 | [Post-MVP] google.generativeai → `google.genai` 마이그레이션 검토 필요 항목으로 기록 |
+| 260310 | [정리] `GeminiAnalyzer`를 `google.genai` SDK 기준으로 마이그레이션 완료 |
+| 260310 | [정리] Chroma 활성 환경에서 exact metadata 기반 retrieval과 파이프라인 연동 검증 완료 |
 | 260225 | [Post-MVP] SBOMScanner 결과 경로 개선, SQLiteLogRepo 도입, diff 뷰어 추가 예정 |

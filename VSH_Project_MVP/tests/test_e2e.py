@@ -3,6 +3,7 @@ import json
 import pytest
 import requests
 from dotenv import load_dotenv
+from config import LOG_PATH as DEFAULT_LOG_PATH
 from pipeline import PipelineFactory
 
 load_dotenv()
@@ -22,7 +23,7 @@ requires_server = pytest.mark.skipif(
 )
 
 # log.json 경로 가져오기
-LOG_PATH = os.getenv("LOG_PATH", "mock_db/log.json")
+LOG_PATH = os.getenv("LOG_PATH", DEFAULT_LOG_PATH)
 
 def _clear_log_json():
     """log.json을 빈 리스트로 초기화합니다."""
@@ -41,7 +42,10 @@ def reset_log_json():
     _clear_log_json()
 
 @pytest.fixture
-def pipeline():
+def pipeline(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     return PipelineFactory.create()
 
 def test_e2e_scan_vulnerable_file(pipeline):
@@ -58,6 +62,33 @@ def test_e2e_scan_vulnerable_file(pipeline):
     
     for suggestion in result["fix_suggestions"]:
         assert suggestion.get("fixed_code"), "fixed_code가 비어있습니다."
+        assert suggestion.get("evidence_refs"), "evidence_refs가 비어있습니다."
+        assert suggestion.get("evidence_summary"), "evidence_summary가 비어있습니다."
+        assert suggestion.get("retrieval_backend"), "retrieval_backend가 비어있습니다."
+        assert suggestion.get("chroma_status"), "chroma_status가 비어있습니다."
+        assert suggestion.get("decision_status"), "decision_status가 비어있습니다."
+        assert "confidence_score" in suggestion, "confidence_score가 누락되었습니다."
+        assert suggestion.get("confidence_reason"), "confidence_reason이 비어있습니다."
+
+    supply_chain = next((s for s in result["fix_suggestions"] if s["cwe_id"] == "CWE-829"), None)
+    assert supply_chain is not None, "CWE-829 공급망 finding이 누락되었습니다."
+    assert supply_chain["registry_status"] == "FOUND"
+    assert supply_chain["osv_status"] == "FOUND"
+    assert supply_chain.get("verification_summary"), "verification_summary가 비어있습니다."
+    assert supply_chain["patch_status"] == "GENERATED"
+    assert supply_chain.get("patch_diff"), "patch_diff가 비어있습니다."
+    assert supply_chain.get("processing_trace"), "processing_trace가 비어있습니다."
+    assert supply_chain["category"] == "supply_chain"
+    assert supply_chain["remediation_kind"] == "version_bump_patch"
+    assert supply_chain["target_ref"] == "dependency:requests"
+    assert supply_chain["decision_status"] == "confirmed"
+    assert supply_chain["confidence_score"] >= 85
+    assert supply_chain.get("confidence_reason"), "confidence_reason이 비어있습니다."
+    assert result["summary"]["findings_total"] >= 1
+    assert result["summary"]["supply_chain_findings_total"] >= 1
+    assert result["summary"]["patch_generated_total"] >= 1
+    assert result["summary"]["decision_confirmed_total"] >= 1
+    assert result["summary"]["confidence_high_total"] >= 1
 
 @requires_server
 def test_e2e_dashboard_api(pipeline):
@@ -75,6 +106,26 @@ def test_e2e_dashboard_api(pipeline):
     for log in data["logs"]:
         assert "original_code" in log
         assert "fixed_code" in log
+        assert "evidence_refs" in log
+        assert "evidence_summary" in log
+        assert "retrieval_backend" in log
+        assert "chroma_status" in log
+        assert "chroma_summary" in log
+        assert "chroma_hits" in log
+        assert "registry_status" in log
+        assert "osv_status" in log
+        assert "verification_summary" in log
+        assert "decision_status" in log
+        assert "confidence_score" in log
+        assert "confidence_reason" in log
+        assert "patch_status" in log
+        assert "patch_summary" in log
+        assert "patch_diff" in log
+        assert "processing_trace" in log
+        assert "processing_summary" in log
+        assert "category" in log
+        assert "remediation_kind" in log
+        assert "target_ref" in log
         
     # 3. pending 항목 추출
     pending_logs = [l for l in data["logs"] if l["status"] == "pending"]
@@ -118,7 +169,16 @@ def test_e2e_log_history(pipeline):
     expected_fields = [
         "issue_id", "file_path", "cwe_id", 
         "severity", "line_number", "code_snippet",
-        "original_code", "fixed_code", "status"
+        "original_code", "fixed_code", "status",
+        "evidence_refs", "evidence_summary",
+        "retrieval_backend", "chroma_status", "chroma_summary", "chroma_hits",
+        "registry_status", "registry_summary",
+        "osv_status", "osv_summary",
+        "verification_summary",
+        "decision_status", "confidence_score", "confidence_reason",
+        "patch_status", "patch_summary", "patch_diff",
+        "processing_trace", "processing_summary",
+        "category", "remediation_kind", "target_ref",
     ]
     
     for log in logs:

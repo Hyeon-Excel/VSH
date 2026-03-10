@@ -80,3 +80,15 @@ Post-MVP: C, JSON, JavaScript (Tree-sitter 파서 추가로 확장)
 - Phase 3: DB 고도화 (Mock JSON → ChromaDB)
 - Phase 4: 인터페이스 확장 (VS Code Extension, CI/CD)
 - Phase 5: 고도화 (오탐률 개선, 언어 확장)
+
+---
+
+## 현재 구현 메모 (2026-03-10)
+
+이 문서는 원래 MVP 요구사항 문서이며, 아래 항목은 현재 구현과의 차이를 설명하기 위한 참고 메모다.
+
+- 현재 analyzer provider는 `Claude`만이 아니라 `Gemini`, `Claude`, `Mock` 3종을 지원한다.
+- 현재 L1 코드 경로는 존재하지만, Semgrep 부분은 실제 바이너리 호출이 아니라 `mock_semgrep_scanner.py` 기반이다.
+- 현재 MCP 공개 도구는 `validate_code` 하나만이 아니라 `validate_code`, `scan_only`, `get_results`, `apply_fix`, `dismiss_issue`, `get_log` 6개다.
+- `apply_fix` / Dashboard Accept는 현재 실제 파일 수정과 백업을 수행하지 않고, 상태 업데이트와 `fixed_code` 반환만 수행한다.
+- Chroma RAG와 patch/diff preview는 현재 브랜치에서 선행 구현되어 있으나, 원래 PRD에서는 Post-MVP 또는 고려 항목으로 분류되어 있었다.

@@ -1,12 +1,18 @@
 import json
 import os
+from pathlib import Path
 from typing import Optional, Dict, List
 from dotenv import load_dotenv
 from .base_repository import BaseWriteRepository
 
 # Load environment variables
 load_dotenv()
-LOG_PATH = os.getenv("LOG_PATH", "mock_db/log.json")
+try:
+    from config import LOG_PATH as DEFAULT_LOG_PATH
+except ImportError:
+    DEFAULT_LOG_PATH = str(Path(__file__).resolve().parent.parent / "mock_db" / "log.json")
+
+LOG_PATH = os.getenv("LOG_PATH", DEFAULT_LOG_PATH)
 
 class MockLogRepo(BaseWriteRepository):
     """
@@ -29,6 +35,9 @@ class MockLogRepo(BaseWriteRepository):
     def _save_data(self, data: List[Dict]) -> bool:
         """내부 헬퍼 메서드: JSON 파일 저장"""
         try:
+            log_dir = os.path.dirname(LOG_PATH)
+            if log_dir:
+                os.makedirs(log_dir, exist_ok=True)
             with open(LOG_PATH, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return True
@@ -93,7 +102,7 @@ class MockLogRepo(BaseWriteRepository):
         Returns:
             bool: 성공 여부
         """
-        valid_statuses = {"pending", "accepted", "dismissed"}
+        valid_statuses = {"pending", "accepted", "dismissed", "analysis_failed"}
         if status not in valid_statuses:
             raise ValueError(f"Invalid status: '{status}'. Must be one of {valid_statuses}")
 

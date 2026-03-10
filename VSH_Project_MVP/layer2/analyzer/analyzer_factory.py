@@ -1,6 +1,4 @@
-from ..base_module import BaseAnalyzer
-from .claude_analyzer import ClaudeAnalyzer
-from .gemini_analyzer import GeminiAnalyzer
+from shared.contracts import BaseAnalyzer
 
 class AnalyzerFactory:
     """
@@ -24,8 +22,13 @@ class AnalyzerFactory:
         """
         provider = provider.lower()
         if provider == "claude":
+            from .claude_analyzer import ClaudeAnalyzer
             return ClaudeAnalyzer(api_key=api_key)
         elif provider == "gemini":
+            from .gemini_analyzer import GeminiAnalyzer
             return GeminiAnalyzer(api_key=api_key)
+        elif provider == "mock":
+            from .mock_analyzer import MockAnalyzer
+            return MockAnalyzer(api_key=api_key)
         else:
-            raise ValueError(f"Unsupported LLM provider: {provider}. Use 'claude' or 'gemini'.")
+            raise ValueError(f"Unsupported LLM provider: {provider}. Use 'claude', 'gemini', or 'mock'.")
