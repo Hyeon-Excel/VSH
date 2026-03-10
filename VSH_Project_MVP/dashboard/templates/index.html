@@ -409,7 +409,7 @@
             return `
                 <div class="${className}">
                     <strong>${label}</strong>
-                    <p>${escapeHtml(value)}</p>
+                    <p>${escapeHtml(String(value))}</p>
                 </div>
             `;
         }
@@ -498,7 +498,7 @@
         // 유틸리티: XSS 방지를 위한 HTML 이스케이프
         function escapeHtml(unsafe) {
             if (!unsafe) return '';
-            return unsafe
+            return String(unsafe)
                  .replace(/&/g, "&amp;")
                  .replace(/</g, "&lt;")
                  .replace(/>/g, "&gt;")

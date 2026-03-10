@@ -41,12 +41,23 @@ class FakeLogRepo:
 class FakePipeline:
     def __init__(self):
         self.log_repo = FakeLogRepo()
+        self.run_called = False
+        self.run_scan_only_called = False
 
     def run(self, file_path: str):
+        self.run_called = True
         return {
             "file_path": file_path,
             "scan_results": [{"cwe_id": "CWE-89"}],
             "fix_suggestions": [{"issue_id": "issue-1"}],
+            "is_clean": False,
+        }
+
+    def run_scan_only(self, file_path: str):
+        self.run_scan_only_called = True
+        return {
+            "file_path": file_path,
+            "scan_results": [{"cwe_id": "CWE-89"}],
             "is_clean": False,
         }
 
@@ -122,3 +133,15 @@ def test_server_documented_tools_follow_expected_contract(monkeypatch):
     assert dismiss_result["status"] == "dismissed"
     assert file_logs["file_path"] == "tests/sample.py"
     assert file_logs["total"] == 1
+
+
+def test_scan_only_uses_detection_only_path_without_full_analysis(monkeypatch):
+    module = _load_server_module(monkeypatch)
+    module.pipeline.run_called = False
+    module.pipeline.run_scan_only_called = False
+
+    result = module.scan_only("tests/sample.py")
+
+    assert result["scan_results"] == [{"cwe_id": "CWE-89"}]
+    assert module.pipeline.run_scan_only_called is True
+    assert module.pipeline.run_called is False
