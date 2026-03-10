@@ -251,6 +251,43 @@ def test_vuln_record_required_fields():
     assert vuln.action_at is None
 
 
+def test_dep_vuln_normalization_separates_vuln_and_cve():
+    from vsh.core.models import DependencyVuln
+    from vsh.engines.schema_normalizer import normalize_dep_vuln
+
+    pkg = normalize_dep_vuln(
+        DependencyVuln(ecosystem="PyPI", name="demo", version="1.0.0", vuln_id="GHSA-xxxx-yyyy", severity="HIGH"),
+        1,
+    )
+
+    assert pkg.vuln_id == "GHSA-xxxx-yyyy"
+    assert pkg.cve_id is None
+    assert pkg.advisory_source == "GHSA"
+
+
+def test_kisa_mapping_from_cwe():
+    finding = Finding(
+        id="X",
+        title="Generic title",
+        severity="HIGH",
+        cwe="CWE-89",
+        file="a.py",
+        line=1,
+        message="m",
+    )
+    vuln = normalize_finding(finding, 1)
+    assert vuln.kisa_ref == "입력데이터 검증 및 표현 1항"
+
+
+def test_run_cmd_missing_binary_returns_127(tmp_path: Path):
+    from vsh.core.utils import run_cmd
+
+    rc, out, err = run_cmd(["definitely-not-existing-binary-vsh-test"], cwd=tmp_path)
+    assert rc == 127
+    assert out == ""
+    assert "not found" in err
+
+
 # NEW: 함수별 세부 경고 테스트
 def test_function_level_risk_warnings(tmp_path: Path):
     """Test function-level risk warnings for specific dangerous functions."""
@@ -378,3 +415,46 @@ os.system(user_cmd)  # 위험한 os.system 사용
     assert "[VSH-L1]" in content
     assert "Function Risk:" in content or "Fix:" in content
 
+
+
+def test_normalized_vuln_record_has_risk_and_confidence(tmp_path: Path):
+    source = tmp_path / "risk_sample.py"
+    source.write_text("result = eval(input())\n")
+
+    cfg = VSHConfig(project_root=tmp_path, out_dir=tmp_path, use_syft=False, language="python")
+    scanner = VSHL1Scanner(cfg)
+    result = scanner.scan()
+
+    assert result.vuln_records
+    vuln = result.vuln_records[0]
+    assert vuln.risk_score is not None
+    assert 0.0 <= vuln.risk_score <= 10.0
+    assert vuln.confidence in {"low", "medium", "high"}
+
+
+def test_reachability_meta_includes_mode(tmp_path: Path):
+    source = tmp_path / "reach.py"
+    source.write_text(
+        "user_input = input()\n"
+        "query = f\"SELECT * FROM users WHERE id = {user_input}\"\n"
+        "cursor.execute(query)\n"
+    )
+
+    cfg = VSHConfig(project_root=tmp_path, out_dir=tmp_path, use_syft=False, language="python")
+    scanner = VSHL1Scanner(cfg)
+    result = scanner.scan()
+
+    if result.findings:
+        assert result.findings[0].meta.get("reachability_mode") == "lightweight_heuristic"
+
+
+def test_sbom_fallback_package_json(tmp_path: Path):
+    pkg = tmp_path / "package.json"
+    pkg.write_text('{"dependencies":{"react":"18.0.0"}}')
+
+    from vsh.engines.sbom_engine import generate_sbom
+
+    cfg = VSHConfig(project_root=tmp_path, out_dir=tmp_path, use_syft=False, language="javascript")
+    sbom = generate_sbom(cfg)
+    assert sbom["source"] == "package.json"
+    assert any(p["name"] == "react" for p in sbom["packages"])

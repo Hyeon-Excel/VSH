@@ -1,66 +1,66 @@
+import json
 import re
-import requests
 from pathlib import Path
+from urllib import error, request
+
 from vsh.core.config import VSHConfig
-from vsh.core.utils import read_text, iter_source_files
+from vsh.core.utils import iter_source_files, read_text
 
-PY_IMPORT_RE = re.compile(r"^\s*import\s+([a-zA-Z0-9_\.]+)", re.M)
-PY_FROM_RE   = re.compile(r"^\s*from\s+([a-zA-Z0-9_\.]+)\s+import\s+", re.M)
-JS_IMPORT_RE = re.compile(r"from\s+['\"]([^'\"]+)['\"]|require\(\s*['\"]([^'\"]+)['\"]\s*\)")
+try:
+    import requests  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    requests = None
 
-def _top_module(name: str) -> str:
-    return name.split(".")[0].strip()
 
-def _is_third_party_py(mod: str) -> bool:
-    # ignore common stdlib-ish heuristic
-    stdish = {"os","sys","re","json","time","pathlib","typing","math","subprocess","threading","asyncio"}
-    return mod not in stdish and not mod.startswith("_")
+PY_IMPORT_RE = re.compile(r"^\s*(?:import|from)\s+([a-zA-Z0-9_\.]+)", re.MULTILINE)
+JS_IMPORT_RE = re.compile(r"(?:import\s+.*?from\s+|require\()\s*[\"']([@a-zA-Z0-9_\-/]+)[\"']")
+
+
+def _http_get_status(url: str, timeout: int = 5) -> int:
+    if requests is not None:
+        try:
+            return requests.get(url, timeout=timeout).status_code
+        except Exception:
+            return 0
+
+    try:
+        req = request.Request(url, method="GET")
+        with request.urlopen(req, timeout=timeout) as resp:
+            return getattr(resp, "status", 200)
+    except error.HTTPError as e:
+        return e.code
+    except (error.URLError, TimeoutError):
+        return 0
+
 
 def extract_imports(project_root: Path, language: str) -> set[str]:
-    pkgs: set[str] = set()
-    if language == "python":
-        for f in iter_source_files(project_root, "python"):
-            t = read_text(f)
-            for m in PY_IMPORT_RE.findall(t):
-                pkgs.add(_top_module(m))
-            for m in PY_FROM_RE.findall(t):
-                pkgs.add(_top_module(m))
-        pkgs = {p for p in pkgs if _is_third_party_py(p)}
-    else:
-        for f in iter_source_files(project_root, "javascript"):
-            t = read_text(f)
-            for a,b in JS_IMPORT_RE.findall(t):
-                name = a or b
-                if not name: 
+    imports: set[str] = set()
+    for file_path in iter_source_files(project_root, language):
+        text = read_text(file_path)
+        if language == "python":
+            for match in PY_IMPORT_RE.findall(text):
+                top = match.split(".")[0]
+                if top and not top.startswith("_"):
+                    imports.add(top)
+        else:
+            for match in JS_IMPORT_RE.findall(text):
+                if match.startswith("."):
                     continue
-                # ignore relative imports
-                if name.startswith(".") or name.startswith("/"):
-                    continue
-                # scoped packages keep @scope/name
-                pkgs.add(name)
-    return pkgs
+                if "/" in match and not match.startswith("@"):
+                    match = match.split("/")[0]
+                imports.add(match)
+    return imports
 
-def pypi_exists(cfg: VSHConfig, name: str) -> bool:
-    url = cfg.pypi_json.format(name=name)
-    try:
-        r = requests.get(url, timeout=5)
-        return r.status_code == 200
-    except Exception:
-        return True  # fail-open
 
-def npm_exists(cfg: VSHConfig, name: str) -> bool:
-    url = cfg.npm_registry.format(name=name)
-    try:
-        r = requests.get(url, timeout=5)
-        return r.status_code == 200
-    except Exception:
-        return True
+def _exists_in_registry(pkg: str, language: str, cfg: VSHConfig) -> bool:
+    if language == "javascript":
+        return _http_get_status(f"https://registry.npmjs.org/{pkg}") == 200
+    return _http_get_status(f"https://pypi.org/pypi/{pkg}/json") == 200
+
 
 def find_hallucinated_packages(cfg: VSHConfig, language: str) -> list[str]:
-    imports = extract_imports(cfg.project_root, language)
     hallucinated: list[str] = []
-    for p in sorted(imports):
-        ok = npm_exists(cfg, p) if language == "javascript" else pypi_exists(cfg, p)
-        if not ok:
-            hallucinated.append(p)
+    for pkg in sorted(extract_imports(cfg.project_root, language)):
+        if not _exists_in_registry(pkg, language, cfg):
+            hallucinated.append(pkg)
     return hallucinated

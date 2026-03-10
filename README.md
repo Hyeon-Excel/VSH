@@ -6,6 +6,13 @@
 
 ---
 
+## 🗓️ 변경 이력
+
+- 2026-03-10: L1 스캐너 리팩토링 후속 반영 (fallback 중복/정합성 보완, 정규화 안정화, 문서 업데이트).
+- 2026-03-10: Reachability 휴리스틱 개선, SBOM fallback 확장(pyproject/package.json), 정규화 risk/confidence 필드 추가.
+
+---
+
 ## 🎯 주요 기능 (L1 핫 패스)
 
 - **Semgrep 기반 코드 패턴 탐지**: SQL 인젝션, XSS, 명령어 삽입 등.
