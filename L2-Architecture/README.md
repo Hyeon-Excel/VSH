@@ -14,7 +14,7 @@
 
 문서 구성 원칙은 다음과 같다.
 
-- `src/vsh`를 차세대 L2 구현 기준선으로 본다
-- `VSH_Project_MVP`는 참고 구현으로만 사용한다
+- 현재 실제 L2 구현 기준선은 `VSH_Project_MVP/layer2`와 `VSH_Project_MVP/orchestration`이다
+- `src/vsh`는 과거 검토 흔적으로만 남아 있으며 현재 구현 기준선이 아니다
 - `layer2` 브랜치를 L2 통합 브랜치로 운영한다
 - 구현 전 계약과 구조를 먼저 고정한다
