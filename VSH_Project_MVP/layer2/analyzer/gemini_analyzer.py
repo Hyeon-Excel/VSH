@@ -2,7 +2,7 @@ import json
 import re
 from typing import List, Dict
 import google.generativeai as genai
-from modules.base_module import BaseAnalyzer
+from shared.contracts import BaseAnalyzer
 from models.scan_result import ScanResult
 from models.fix_suggestion import FixSuggestion
 from .confidence_support import build_decision_metadata

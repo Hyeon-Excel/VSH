@@ -1,6 +1,6 @@
-from .base_pipeline import BasePipeline
-from .analysis_pipeline import AnalysisPipeline
-from .pipeline_factory import PipelineFactory
+from orchestration import AnalysisPipeline
+from orchestration import BasePipeline
+from orchestration import PipelineFactory
 
 __all__ = [
     "BasePipeline",
