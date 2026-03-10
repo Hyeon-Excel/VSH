@@ -19,17 +19,23 @@
 
 3. 환경변수 설정
    cp .env.example .env
-   .env 파일에 ANTHROPIC_API_KEY 입력
+   로컬 구조 확인만 할 때는 `.env`에서 `LLM_PROVIDER=mock` 유지
+   실제 LLM을 검증하려면 아래 중 하나를 설정
+   - `LLM_PROVIDER=gemini` + `GEMINI_API_KEY`
+   - `LLM_PROVIDER=claude` + `ANTHROPIC_API_KEY`
 
 4. 실행 확인
-   python mcp_server.py
+   python interfaces/mcp/server.py
+
+5. 대시보드 확인
+   uvicorn dashboard.app:app --port 3000
 
 ## 핵심 규칙 요약
 
 - 레이어 간 역방향 의존 절대 금지
-- tools/ 는 pipeline/ 에만 의존 (modules/ 직접 호출 금지)
-- 새 스캐너 추가 시 BaseScanner 상속하여 구현체만 추가
-- 새 DB 추가 시 BaseRepository 상속하여 구현체만 추가
+- interfaces/ 는 orchestration/ 에만 의존
+- 새 스캐너 추가 시 `shared/contracts.py`의 `BaseScanner` 기준을 따름
+- 새 DB 추가 시 `BaseReadRepository` / `BaseWriteRepository` 기준을 따름
 - 반환 타입은 항상 models/ 도메인 모델 사용
 
 ## 모르는 것이 생기면

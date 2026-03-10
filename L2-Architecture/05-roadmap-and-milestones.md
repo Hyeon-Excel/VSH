@@ -1,11 +1,15 @@
 # L2 Roadmap and Milestones
 
+> 중요: 이 문서는 현재 코드베이스 기준으로 갱신된 로드맵이다.
+> 과거 `src/vsh` 복구 계획은 더 이상 기준선이 아니며,
+> 현재 실제 구현 기준선은 `VSH_Project_MVP/layer2`와 `VSH_Project_MVP/orchestration`이다.
+
 ## 1. 구현 우선순위
 
 구현은 아래 순서를 유지한다.
 
-1. 공통 모델 복구
-2. L2 service 골격 구현
+1. 현재 기준선 정리
+2. L2 orchestration 골격 정리
 3. evidence retrieval 구현
 4. verifier 구현
 5. patch 생성 구현
@@ -16,25 +20,23 @@
 
 ## 2. 단계별 로드맵
 
-### Phase 0. 기준선 복구
+### Phase 0. 현재 기준선 확정
 
 목표:
 
-- `src/vsh` import 가능 상태 복구
-- L2 관련 실제 `.py` 파일 재생성
-- 모델과 서비스의 기본 계약 복구
+- 현재 기준선이 `VSH_Project_MVP/layer2`임을 명확히 함
+- `layer2`, `orchestration`, `models` 간 계약 정리
+- 실제 코드가 없는 `src/vsh` 계획을 로드맵 기준선에서 제거
 
 작업:
 
-- `src/vsh/common/models.py` 복구
-- `src/vsh/l2_warm/service.py` 복구
-- `src/vsh/l2_warm/rag/retriever.py` 복구
-- `src/vsh/l2_warm/verification/registry.py` 복구
-- `src/vsh/l2_warm/verification/osv.py` 복구
+- `models/fix_suggestion.py` 계약 정리
+- `orchestration/analysis_pipeline.py` 진입 흐름 정리
+- `layer2/` 하위 책임 분리 기준 확정
 
 완료 기준:
 
-- `python -c "import vsh.l2_warm.service"` 성공
+- `PipelineFactory.create()`로 L2 실행 가능
 - 최소 smoke test 통과
 
 ### Phase 1. 계약 고정
@@ -42,13 +44,13 @@
 목표:
 
 - request/response 모델 고정
-- `L2Service.enrich_fix()` 시그니처 고정
+- `AnalysisPipeline.run()` 기준 출력 계약 고정
 - category별 처리 방향 고정
 
 작업:
 
 - 모델 정의
-- service 골격 구현
+- pipeline 골격 구현
 - placeholder verification summary 반환
 
 완료 기준:
@@ -135,12 +137,12 @@
 산출물:
 
 - 공통 모델
-- `L2Service` 기본 골격
+- `AnalysisPipeline` 기본 골격
 - placeholder retriever 및 verifier
 
 완료 기준:
 
-- import 성공
+- pipeline 실행 성공
 - 빈 입력 및 기본 fixture 처리 가능
 
 ### Milestone 2. Evidence Ready

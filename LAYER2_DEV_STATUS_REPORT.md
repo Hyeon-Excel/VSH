@@ -11,15 +11,15 @@
 이 문서는 아래 사실을 기준으로 작성했다.
 
 - 현재 브랜치: `layer2-dev`
-- 현재 `HEAD`: `0acc7858b3d1dee0aac2e44b35c1c7f646ed5859`
+- 현재 `HEAD`: `ade63dcdec95bf3ece2216ff3ac05e48c81f76d3`
 - 비교 기준 브랜치 `layer2`: `8bc3e85be33aac68cedb0f7a04b4e308d8e0683c`
 - `HEAD`와 `layer2`의 merge-base: `8bc3e85be33aac68cedb0f7a04b4e308d8e0683c`
 - 즉, 현재 `layer2-dev`는 `layer2`에서 직접 갈라졌고, `layer2`는 아직 같은 기준 커밋에 머물러 있다.
-- `layer2..HEAD` 커밋 수: `15`
-- `layer2..HEAD` diff 통계: `75 files changed, 4870 insertions(+), 1048 deletions(-)`
+- `layer2..HEAD` 커밋 수: `16`
+- `layer2..HEAD` diff 통계: `76 files changed, 5235 insertions(+), 1048 deletions(-)`
 - `layer2..HEAD` 파일 상태 요약:
   - modified: `28`
-  - added: `43`
+  - added: `44`
   - renamed: `1`
   - deleted: `3`
 - 현재 working tree 상태: `3`개 엔트리 변경 중
@@ -48,7 +48,7 @@
 이 점은 다음 사실로 확인된다.
 
 - `git rev-parse layer2`와 `git merge-base HEAD layer2`가 모두 `8bc3e85...`
-- `git log --oneline layer2..HEAD`에 L2 구현 관련 커밋이 15개 존재
+- `git log --oneline layer2..HEAD`에 L2 구현 관련 커밋이 16개 존재
 
 정리하면, `layer2-dev`는 “문서만 있던 `layer2` 기준선”에서 실제 동작 코드가 쌓인 브랜치다.
 
@@ -75,6 +75,7 @@
 | 13 | `3629097` | refactor: L2 공급망 공통 유틸과 문서 기준선 정리 |
 | 14 | `9b9b845` | refactor: L1/L2/orchestration/interface 계층 구조를 재정리 |
 | 15 | `0acc785` | refactor: L2 analyzer 공통화와 Chroma 활성 경로를 정리 |
+| 16 | `ade63dc` | feat: L2 브랜치 상태 보고서 추가 |
 
 커밋 흐름을 기능 관점으로 묶으면 다음과 같다.
 
@@ -188,7 +189,7 @@
 
 ## 5. 현재 `HEAD` 기준 구현 범위
 
-현재 `HEAD`(`0acc785`) 기준으로 실제 구현되어 있는 범위는 아래와 같다.
+현재 `HEAD`(`ade63dc`) 기준으로 실제 구현되어 있는 범위는 아래와 같다.
 
 ### 5.1 L1 영역
 

@@ -14,7 +14,8 @@ Domain Model은 레이어 간 데이터 전달의 핵심이며, 모든 레이어
    - **Vulnerable**: `ScanResult` 객체를 Analyzer(L2)로 전달합니다.
 
 3. **Analyzer (L2)**: 취약점 분석 후 수정 제안을 담은 `FixSuggestion` 객체를 생성합니다.
-   - `FixSuggestion(issue_id, original_code, fixed_code, description)`
+   - 현재 `FixSuggestion`은 `issue_id`, `original_code`, `fixed_code`, `description` 외에도
+     evidence, verification, confidence, patch, handoff 메타데이터를 함께 포함합니다.
 
 4. **Repository**: `FixSuggestion` 및 `ScanResult` 정보를 DB에 저장합니다.
 
@@ -54,13 +55,17 @@ Repository 레이어는 상위 레이어가 데이터의 물리적 저장소에 
 3. **통합 및 중복 제거**:
    - 수집된 모든 `findings` 통합.
    - `_deduplicate()` 메서드(`cwe_id` + `line_number` 기준)로 중복된 취약점 제거.
-4. **L2 분석 (심층 분석 및 수정 제안)**:
-   - `knowledge_repo.find_all()`과 `fix_repo.find_all()`을 통해 전체 데이터를 가져옴.
+4. **L2 분석 입력 준비**:
+   - `knowledge_repo.find_all()`과 `fix_repo.find_all()`을 통해 정적 데이터를 가져옴.
+   - `EvidenceRetriever`가 evidence context를 생성.
+   - supply chain finding은 `RegistryVerifier`, `OsvVerifier`를 통해 verification context를 생성.
+5. **L2 분석 (심층 분석 및 수정 제안)**:
    - `analyzer.analyze()` 호출.
-5. **로깅 및 상태 추적**:
+   - analyzer 출력은 pipeline에서 confidence, patch, handoff 필드까지 보정 및 정규화됨.
+6. **로깅 및 상태 추적**:
    - Analyzer가 반환한 `fix_suggestions`를 순회하며 `LogRepo`에 초기 상태(`status="pending"`)와 함께 상세 정보 저장.
-6. **출력 반환**:
-   - `scan_results`와 `fix_suggestions` 객체들을 JSON으로 직렬화할 수 있는 `dict` 리스트 형태로 변환하여 최종 반환.
+7. **출력 반환**:
+   - `scan_results`, `fix_suggestions`, `summary`를 포함한 구조화 결과를 최종 반환.
 
 ---
 
