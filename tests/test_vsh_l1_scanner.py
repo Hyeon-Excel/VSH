@@ -251,6 +251,43 @@ def test_vuln_record_required_fields():
     assert vuln.action_at is None
 
 
+def test_dep_vuln_normalization_separates_vuln_and_cve():
+    from vsh.core.models import DependencyVuln
+    from vsh.engines.schema_normalizer import normalize_dep_vuln
+
+    pkg = normalize_dep_vuln(
+        DependencyVuln(ecosystem="PyPI", name="demo", version="1.0.0", vuln_id="GHSA-xxxx-yyyy", severity="HIGH"),
+        1,
+    )
+
+    assert pkg.vuln_id == "GHSA-xxxx-yyyy"
+    assert pkg.cve_id is None
+    assert pkg.advisory_source == "GHSA"
+
+
+def test_kisa_mapping_from_cwe():
+    finding = Finding(
+        id="X",
+        title="Generic title",
+        severity="HIGH",
+        cwe="CWE-89",
+        file="a.py",
+        line=1,
+        message="m",
+    )
+    vuln = normalize_finding(finding, 1)
+    assert vuln.kisa_ref == "입력데이터 검증 및 표현 1항"
+
+
+def test_run_cmd_missing_binary_returns_127(tmp_path: Path):
+    from vsh.core.utils import run_cmd
+
+    rc, out, err = run_cmd(["definitely-not-existing-binary-vsh-test"], cwd=tmp_path)
+    assert rc == 127
+    assert out == ""
+    assert "not found" in err
+
+
 # NEW: 함수별 세부 경고 테스트
 def test_function_level_risk_warnings(tmp_path: Path):
     """Test function-level risk warnings for specific dangerous functions."""

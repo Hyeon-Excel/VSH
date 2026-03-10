@@ -1,7 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import Literal, Optional, Any
-from datetime import datetime
-
 Severity = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
 
 class Finding(BaseModel):
@@ -44,13 +42,15 @@ class VulnRecord(BaseModel):
 
 class PackageRecord(BaseModel):
     """Normalized package/dependency record used across L1/L2/L3 layers."""
-    package_id: str  # PKG-XXX format
+    package_id: str  # stable package identifier (e.g. PKG-PYPI-requests-2.31.0)
     source: str  # "L1_SBOM", "L1_OSV", "L3_SBOM", etc.
     detected_at: str  # ISO 8601 datetime
     name: str
     version: str
     ecosystem: str  # "PyPI", "npm", etc.
+    vuln_id: Optional[str] = None
     cve_id: Optional[str] = None
+    advisory_source: Optional[str] = None
     severity: Optional[Severity] = None
     cvss_score: Optional[float] = None
     license: Optional[str] = None
