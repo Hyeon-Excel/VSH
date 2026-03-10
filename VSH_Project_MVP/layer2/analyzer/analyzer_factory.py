@@ -1,4 +1,4 @@
-from modules.base_module import BaseAnalyzer
+from shared.contracts import BaseAnalyzer
 
 class AnalyzerFactory:
     """

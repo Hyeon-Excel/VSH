@@ -70,17 +70,17 @@ def _load_server_module(monkeypatch):
     fake_fastmcp = types.ModuleType("fastmcp")
     fake_fastmcp.FastMCP = FakeMCP
 
-    fake_pipeline_module = types.ModuleType("pipeline")
+    fake_orchestration_module = types.ModuleType("orchestration")
 
     class FakePipelineFactory:
         @staticmethod
         def create():
             return fake_pipeline
 
-    fake_pipeline_module.PipelineFactory = FakePipelineFactory
+    fake_orchestration_module.PipelineFactory = FakePipelineFactory
 
     monkeypatch.setitem(sys.modules, "fastmcp", fake_fastmcp)
-    monkeypatch.setitem(sys.modules, "pipeline", fake_pipeline_module)
+    monkeypatch.setitem(sys.modules, "orchestration", fake_orchestration_module)
 
     spec = importlib.util.spec_from_file_location("test_server_module", SERVER_PATH)
     module = importlib.util.module_from_spec(spec)

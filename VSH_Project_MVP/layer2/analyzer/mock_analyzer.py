@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from layer2.common.requirement_parser import parse_requirement_line
-from modules.base_module import BaseAnalyzer
+from shared.contracts import BaseAnalyzer
 from models.fix_suggestion import FixSuggestion
 from models.scan_result import ScanResult
 from .confidence_support import build_decision_metadata
