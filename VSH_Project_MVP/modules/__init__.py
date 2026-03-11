@@ -6,6 +6,7 @@ __all__ = [
     "BaseScanner",
     "BaseAnalyzer",
     "SemgrepScanner",
+    "VSHL1Scanner",
     "TreeSitterScanner",
     "SBOMScanner",
     "EvidenceRetriever",
@@ -19,6 +20,10 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    if name == "VSHL1Scanner":
+        from layer1.scanner import VSHL1Scanner
+
+        return VSHL1Scanner
     if name == "TreeSitterScanner":
         from layer1.scanner import TreeSitterScanner
 

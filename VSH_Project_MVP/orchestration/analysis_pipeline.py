@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 from typing import Dict, List, Optional
 from .base_pipeline import BasePipeline
 from shared.contracts import BaseScanner, BaseAnalyzer
@@ -136,9 +137,18 @@ class AnalysisPipeline(BasePipeline):
         unique_findings = self._deduplicate(self._scan_all_findings(file_path))
         return ScanResult(
             file_path=file_path,
-            language="python",
+            language=self._infer_language(file_path),
             findings=unique_findings,
         )
+
+    @staticmethod
+    def _infer_language(file_path: str) -> str:
+        suffix = Path(file_path).suffix.lower()
+        if suffix in {".js", ".jsx", ".mjs"}:
+            return "javascript"
+        if suffix in {".ts", ".tsx"}:
+            return "typescript"
+        return "python"
 
     def _load_analysis_sources(self) -> tuple[List[Dict], List[Dict]]:
         return self.knowledge_repo.find_all(), self.fix_repo.find_all()

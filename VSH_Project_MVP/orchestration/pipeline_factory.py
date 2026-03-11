@@ -20,6 +20,14 @@ class PipelineFactory:
 
     @staticmethod
     def _create_scanners(knowledge_repo) -> List:
+        # hyeonexcel 수정: layer2 기준 구조를 유지한 채 L1 donor 브랜치의 확장 scanner를
+        # 선택적으로 붙일 수 있도록 mode 분기를 추가한다.
+        l1_mode = os.getenv("L1_SCANNER_MODE", "classic").lower()
+        if l1_mode in {"integrated", "vsh"}:
+            from layer1.scanner import VSHL1Scanner
+
+            return [VSHL1Scanner(knowledge_repo=knowledge_repo)]
+
         scanners = [SemgrepScanner(knowledge_repo=knowledge_repo)]
 
         try:
