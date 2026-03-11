@@ -62,3 +62,32 @@ def test_pipeline_factory_can_enable_integrated_l1_scanner(monkeypatch):
 
     assert len(pipeline.scanners) == 1
     assert isinstance(pipeline.scanners[0], VSHL1Scanner)
+
+
+def test_integrated_pipeline_exposes_l1_normalized_outputs(monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.setenv("L1_SCANNER_MODE", "integrated")
+
+    sample = tmp_path / "integrated.py"
+    sample.write_text(
+        "\n".join(
+            [
+                "import reqeusts",
+                "user_input = input()",
+                'cursor.execute(f"SELECT * FROM users WHERE id={user_input}")',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    pipeline = PipelineFactory.create()
+    scan_only_result = pipeline.run_scan_only(str(sample))
+    run_result = pipeline.run(str(sample))
+
+    assert scan_only_result["vuln_records"]
+    assert scan_only_result["package_records"]
+    assert scan_only_result["annotated_files"]
+    assert run_result["vuln_records"]
+    assert run_result["package_records"]
+    assert run_result["annotated_files"]
+    assert "fix_suggestions" in run_result

@@ -46,13 +46,17 @@ class AnalysisPipeline(BasePipeline):
         """
         retriever_status = self._get_retriever_status()
         if not os.path.exists(file_path):
-            return self._build_run_result(file_path, [], [], True, retriever_status)
+            empty_result = ScanResult(
+                file_path=file_path,
+                language=self._infer_language(file_path),
+                findings=[],
+            )
+            return self._build_run_result(empty_result, [], True, retriever_status)
 
         integrated_scan_result = self._build_integrated_scan_result(file_path)
         if integrated_scan_result.is_clean():
             return self._build_run_result(
-                file_path,
-                integrated_scan_result.findings,
+                integrated_scan_result,
                 [],
                 True,
                 retriever_status,
@@ -92,8 +96,7 @@ class AnalysisPipeline(BasePipeline):
             )
 
         return self._build_run_result(
-            file_path=file_path,
-            findings=integrated_scan_result.findings,
+            integrated_scan_result=integrated_scan_result,
             fix_suggestions=fix_suggestions,
             is_clean=False,
             retriever_status=retriever_status,
@@ -108,6 +111,10 @@ class AnalysisPipeline(BasePipeline):
             return {
                 "file_path": file_path,
                 "scan_results": [],
+                "vuln_records": [],
+                "package_records": [],
+                "annotated_files": {},
+                "notes": [],
                 "is_clean": True,
             }
 
@@ -115,31 +122,47 @@ class AnalysisPipeline(BasePipeline):
         return {
             "file_path": file_path,
             "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
+            "vuln_records": integrated_scan_result.vuln_records,
+            "package_records": integrated_scan_result.package_records,
+            "annotated_files": integrated_scan_result.annotated_files,
+            "notes": integrated_scan_result.notes,
             "is_clean": integrated_scan_result.is_clean(),
         }
 
-    def _scan_all_findings(self, file_path: str) -> List[Vulnerability]:
-        all_findings: List[Vulnerability] = []
+    def _scan_all_results(self, file_path: str) -> List[ScanResult]:
+        all_results: List[ScanResult] = []
         for scanner in self.scanners:
             try:
                 result = scanner.scan(file_path)
-                if result and result.findings:
-                    all_findings.extend(result.findings)
+                if result:
+                    all_results.append(result)
             except ValueError as e:
                 print(f"[WARN] Unsupported language: {e}")
             except Exception as e:
                 print(f"[WARN] Scanner execution failed: {e}")
-        return all_findings
+        return all_results
 
     def _build_integrated_scan_result(self, file_path: str) -> ScanResult:
         # hyeonexcel 수정: run()에 몰려 있던 스캔/중복 제거/통합 ScanResult 생성을 분리해
         # 이후 L3 handoff나 멀티 언어 확장 시 입력 단계만 독립적으로 다룰 수 있게 한다.
-        unique_findings = self._deduplicate(self._scan_all_findings(file_path))
-        return ScanResult(
+        scan_results = self._scan_all_results(file_path)
+        unique_findings = self._deduplicate(
+            [
+                finding
+                for result in scan_results
+                for finding in result.findings
+            ]
+        )
+        integrated_result = ScanResult(
             file_path=file_path,
             language=self._infer_language(file_path),
             findings=unique_findings,
         )
+        integrated_result.vuln_records = self._merge_vuln_records(scan_results)
+        integrated_result.package_records = self._merge_package_records(scan_results)
+        integrated_result.notes = self._merge_notes(scan_results)
+        integrated_result.annotated_files = self._build_annotation_preview(integrated_result)
+        return integrated_result
 
     @staticmethod
     def _infer_language(file_path: str) -> str:
@@ -358,23 +381,81 @@ class AnalysisPipeline(BasePipeline):
 
     def _build_run_result(
         self,
-        file_path: str,
-        findings: List[Vulnerability],
+        integrated_scan_result: ScanResult,
         fix_suggestions: List[FixSuggestion],
         is_clean: bool,
         retriever_status: Dict[str, str],
     ) -> dict:
         return {
-            "file_path": file_path,
-            "scan_results": [v.model_dump() for v in findings],
+            "file_path": integrated_scan_result.file_path,
+            "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
+            "vuln_records": integrated_scan_result.vuln_records,
+            "package_records": integrated_scan_result.package_records,
+            "annotated_files": integrated_scan_result.annotated_files,
+            "notes": integrated_scan_result.notes,
             "fix_suggestions": [f.model_dump() for f in fix_suggestions],
             "is_clean": is_clean,
             "summary": self._build_run_summary(
-                findings,
+                integrated_scan_result.findings,
                 fix_suggestions,
                 retriever_status,
             ),
         }
+
+    def _build_annotation_preview(self, integrated_scan_result: ScanResult) -> Dict[str, str]:
+        for scanner in self.scanners:
+            if not hasattr(scanner, "annotate"):
+                continue
+            try:
+                annotated_result = scanner.annotate(integrated_scan_result.model_copy(deep=True))
+                if annotated_result.annotated_files:
+                    return annotated_result.annotated_files
+            except Exception as exc:
+                print(f"[WARN] Annotation preview failed: {exc}")
+        return {}
+
+    @staticmethod
+    def _merge_notes(scan_results: List[ScanResult]) -> List[str]:
+        merged: List[str] = []
+        seen: set[str] = set()
+        for result in scan_results:
+            for note in result.notes:
+                if note in seen:
+                    continue
+                seen.add(note)
+                merged.append(note)
+        return merged
+
+    @staticmethod
+    def _merge_vuln_records(scan_results: List[ScanResult]) -> List[Dict]:
+        merged: List[Dict] = []
+        seen: set[tuple[str | None, int | None, str | None]] = set()
+        for result in scan_results:
+            for record in result.vuln_records:
+                key = (
+                    record.get("file_path"),
+                    record.get("line_number"),
+                    record.get("cwe_id"),
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                merged.append(record)
+        return merged
+
+    @staticmethod
+    def _merge_package_records(scan_results: List[ScanResult]) -> List[Dict]:
+        merged: List[Dict] = []
+        seen: set[str] = set()
+        for result in scan_results:
+            for record in result.package_records:
+                package_id = record.get("package_id")
+                if package_id in seen:
+                    continue
+                if package_id:
+                    seen.add(package_id)
+                merged.append(record)
+        return merged
 
     def _get_retriever_status(self) -> Dict[str, str]:
         if hasattr(self.evidence_retriever, "runtime_status"):
