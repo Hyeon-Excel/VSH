@@ -106,6 +106,9 @@ def test_e2e_dashboard_api(pipeline):
     for log in data["logs"]:
         assert "original_code" in log
         assert "fixed_code" in log
+        assert "rule_id" in log
+        assert "l1_reachability_status" in log
+        assert "l1_references" in log
         assert "evidence_refs" in log
         assert "evidence_summary" in log
         assert "retrieval_backend" in log
@@ -170,6 +173,7 @@ def test_e2e_log_history(pipeline):
         "issue_id", "file_path", "cwe_id", 
         "severity", "line_number", "code_snippet",
         "original_code", "fixed_code", "status",
+        "rule_id", "l1_reachability_status", "l1_references",
         "evidence_refs", "evidence_summary",
         "retrieval_backend", "chroma_status", "chroma_summary", "chroma_hits",
         "registry_status", "registry_summary",

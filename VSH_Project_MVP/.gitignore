@@ -15,6 +15,9 @@ __pycache__/
 # log.json은 런타임에 쌓이는 데이터이므로 추적하지 않습니다.
 mock_db/log.json
 
+# Chroma runtime database
+.chroma_db/
+
 # Test / Output files
 output_real.txt
 test_version.txt
