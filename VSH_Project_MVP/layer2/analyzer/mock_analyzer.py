@@ -83,6 +83,7 @@ class MockAnalyzer(BaseAnalyzer):
                     reachability=self._build_reachability(
                         finding.cwe_id,
                         file_path,
+                        finding.reachability_status,
                         verification_summary=verification_summary,
                     ),
                     kisa_reference=primary_reference,
@@ -157,6 +158,7 @@ class MockAnalyzer(BaseAnalyzer):
     def _build_reachability(
         cwe_id: str,
         file_path: str,
+        reachability_status: str | None = None,
         verification_summary: str | None = None,
     ) -> str:
         file_name = Path(file_path).name
@@ -164,6 +166,8 @@ class MockAnalyzer(BaseAnalyzer):
             base = f"{file_name}에 취약 버전 의존성이 직접 선언되어 있어 즉시 수정 대상입니다."
         else:
             base = f"{file_name}에서 탐지 규칙과 일치하는 위험 코드가 직접 발견되었습니다."
+        if reachability_status:
+            base = f"{base} Reachability={reachability_status}."
         if verification_summary:
             return f"{base} {verification_summary}"
         return base
