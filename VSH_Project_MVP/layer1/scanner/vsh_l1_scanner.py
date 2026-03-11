@@ -8,7 +8,14 @@ from models.vulnerability import Vulnerability
 from repository.base_repository import BaseReadRepository
 from shared.contracts import BaseScanner
 
-from layer1.common import annotate_reachability, detect_typosquatting_findings, guess_language, scan_file_with_patterns
+from layer1.common import (
+    annotate_files,
+    annotate_reachability,
+    detect_typosquatting_findings,
+    guess_language,
+    normalize_scan_result,
+    scan_file_with_patterns,
+)
 from .mock_semgrep_scanner import MockSemgrepScanner
 from .sbom_scanner import SBOMScanner
 
@@ -57,14 +64,23 @@ class VSHL1Scanner(BaseScanner):
         if language == "python":
             findings.extend(self.sbom_scanner.scan(file_path).findings)
 
-        return ScanResult(
+        result = ScanResult(
             file_path=file_path,
             language=language,
             findings=self._deduplicate(findings),
         )
+        return normalize_scan_result(result)
 
     def supported_languages(self) -> List[str]:
         return ["python", "javascript", "typescript"]
+
+    def annotate(self, result: ScanResult) -> ScanResult:
+        """
+        hyeonexcel 수정: donor L1 브랜치의 code annotator 개념을 side-effect 없는 preview로 옮겨
+        실제 파일 수정 없이 annotated_files만 반환한다.
+        """
+        result.annotated_files = annotate_files(result.findings)
+        return result
 
     @staticmethod
     def _deduplicate(findings: List[Vulnerability]) -> List[Vulnerability]:
