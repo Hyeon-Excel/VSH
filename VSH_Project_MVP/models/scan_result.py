@@ -1,5 +1,6 @@
-from typing import List
-from pydantic import BaseModel
+from typing import Any, Dict, List
+
+from pydantic import BaseModel, Field
 from models.vulnerability import Vulnerability
 
 class ScanResult(BaseModel):
@@ -13,7 +14,11 @@ class ScanResult(BaseModel):
     """
     file_path: str
     language: str
-    findings: List[Vulnerability] = []
+    findings: List[Vulnerability] = Field(default_factory=list)
+    vuln_records: List[Dict[str, Any]] = Field(default_factory=list)
+    package_records: List[Dict[str, Any]] = Field(default_factory=list)
+    annotated_files: Dict[str, str] = Field(default_factory=dict)
+    notes: List[str] = Field(default_factory=list)
 
     def is_clean(self) -> bool:
         """
