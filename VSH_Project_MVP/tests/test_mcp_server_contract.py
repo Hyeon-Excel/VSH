@@ -49,6 +49,10 @@ class FakePipeline:
         return {
             "file_path": file_path,
             "scan_results": [{"cwe_id": "CWE-89"}],
+            "vuln_records": [{"vuln_id": "VSH-001"}],
+            "package_records": [{"package_id": "PKG-001"}],
+            "annotated_files": {file_path: "# preview"},
+            "notes": ["layer=L1"],
             "fix_suggestions": [{"issue_id": "issue-1"}],
             "is_clean": False,
         }
@@ -58,6 +62,10 @@ class FakePipeline:
         return {
             "file_path": file_path,
             "scan_results": [{"cwe_id": "CWE-89"}],
+            "vuln_records": [{"vuln_id": "VSH-001"}],
+            "package_records": [{"package_id": "PKG-001"}],
+            "annotated_files": {file_path: "# preview"},
+            "notes": ["layer=L1"],
             "is_clean": False,
         }
 
@@ -127,6 +135,10 @@ def test_server_documented_tools_follow_expected_contract(monkeypatch):
     assert "fix_suggestions" in validate_result
     assert scan_only_result["file_path"] == "tests/sample.py"
     assert "fix_suggestions" not in scan_only_result
+    assert scan_only_result["vuln_records"] == [{"vuln_id": "VSH-001"}]
+    assert scan_only_result["package_records"] == [{"package_id": "PKG-001"}]
+    assert scan_only_result["annotated_files"] == {"tests/sample.py": "# preview"}
+    assert scan_only_result["notes"] == ["layer=L1"]
     assert results["total"] == 2
     assert apply_result["status"] == "accepted"
     assert apply_result["fixed_code"] == "print('safe')"
@@ -143,5 +155,8 @@ def test_scan_only_uses_detection_only_path_without_full_analysis(monkeypatch):
     result = module.scan_only("tests/sample.py")
 
     assert result["scan_results"] == [{"cwe_id": "CWE-89"}]
+    assert result["vuln_records"] == [{"vuln_id": "VSH-001"}]
+    assert result["package_records"] == [{"package_id": "PKG-001"}]
+    assert result["annotated_files"] == {"tests/sample.py": "# preview"}
     assert module.pipeline.run_scan_only_called is True
     assert module.pipeline.run_called is False
