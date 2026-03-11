@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from layer2.common.requirement_parser import parse_requirement_line
+from models.common_schema import PackageRecord, VulnRecord
 from models.scan_result import ScanResult
 from models.vulnerability import Vulnerability
 
@@ -68,34 +68,57 @@ def _vuln_type_from_finding(finding: Vulnerability) -> str:
     return mapping.get(finding.cwe_id, "GENERIC")
 
 
-def _normalize_vuln_record(finding: Vulnerability, index: int) -> dict[str, Any]:
-    return {
-        "vuln_id": _gen_vuln_id(index),
-        "rule_id": finding.rule_id,
-        "source": "L1",
-        "detected_at": _now_iso(),
-        "file_path": finding.file_path,
-        "line_number": finding.line_number,
-        "language": _guess_language(finding.file_path or ""),
-        "vuln_type": _vuln_type_from_finding(finding),
-        "cwe_id": finding.cwe_id,
-        "severity": finding.severity,
-        "reachability_status": _normalize_reachability(finding.reachability_status),
-        "kisa_ref": KISA_MAPPING.get(finding.cwe_id, "미매핑-추후보강"),
-        "owasp_ref": OWASP_MAPPING.get(finding.cwe_id),
-        "evidence": finding.code_snippet,
-        "references": list(finding.references),
-        "status": "pending",
-        "metadata": dict(finding.metadata),
+def _build_rule_id(finding: Vulnerability) -> str:
+    if finding.rule_id:
+        return finding.rule_id
+    compact_cwe = finding.cwe_id.replace("-", "")
+    return f"VSH-{compact_cwe}-GENERIC"
+
+
+def _build_fix_suggestion(finding: Vulnerability) -> str:
+    suggestions = {
+        "CWE-79": "innerHTML 대신 textContent 또는 안전한 escaping 적용",
+        "CWE-89": "사용자 입력을 문자열 포매팅하지 말고 parameterized query 사용",
+        "CWE-22": "상대 경로 입력을 정규화하고 허용 경로만 접근",
+        "CWE-78": "쉘 명령 조합 대신 안전한 인자 전달 방식 사용",
+        "CWE-798": "하드코딩된 비밀값을 제거하고 환경변수/비밀 저장소 사용",
+        "CWE-829": "안전한 버전 기준으로 의존성 업그레이드",
+        "CWE-1104": "오타 또는 비정상 패키지명을 검토하고 정식 패키지로 교체",
     }
+    return suggestions.get(finding.cwe_id, "L2 분석 결과를 바탕으로 안전한 구현으로 수정")
 
 
-def _normalize_reachability(status: str | None) -> str:
-    if status == "YES":
-        return "reachable"
-    if status == "NO":
-        return "unreachable"
-    return "unknown"
+def _build_end_column(code_snippet: str) -> int:
+    return max(1, len(code_snippet.strip()) or len(code_snippet) or 1)
+
+
+def _normalize_vuln_record(finding: Vulnerability, index: int) -> VulnRecord:
+    return VulnRecord(
+        vuln_id=_gen_vuln_id(index),
+        rule_id=_build_rule_id(finding),
+        source="L1",
+        detected_at=_now_iso(),
+        file_path=finding.file_path or "<unknown>",
+        line_number=finding.line_number,
+        end_line_number=finding.line_number,
+        column_number=1,
+        end_column_number=_build_end_column(finding.code_snippet),
+        language=_guess_language(finding.file_path or ""),
+        vuln_type=_vuln_type_from_finding(finding),
+        cwe_id=finding.cwe_id,
+        cve_id=finding.metadata.get("cve_id"),
+        severity=finding.severity,
+        # 공통 스키마 규칙에 따라 L1 정규화 결과는 reachability를 항상 unknown으로 기록한다.
+        reachability_status="unknown",
+        reachability_confidence="low",
+        kisa_ref=KISA_MAPPING.get(finding.cwe_id, "미매핑-추후보강"),
+        fss_ref=finding.metadata.get("fss_ref"),
+        owasp_ref=OWASP_MAPPING.get(finding.cwe_id),
+        evidence=finding.code_snippet,
+        fix_suggestion=_build_fix_suggestion(finding),
+        status="pending",
+        action_at=None,
+    )
 
 
 def _guess_language(file_path: str) -> str:
@@ -107,61 +130,38 @@ def _guess_language(file_path: str) -> str:
     return "python"
 
 
-def _normalize_package_records(findings: list[Vulnerability]) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
+def _normalize_package_records(findings: list[Vulnerability]) -> list[PackageRecord]:
+    records: list[PackageRecord] = []
     seen: set[str] = set()
 
     for finding in findings:
-        if finding.cwe_id not in {"CWE-829", "CWE-1104"}:
+        if finding.cwe_id != "CWE-829":
             continue
 
-        if finding.cwe_id == "CWE-829":
-            package_name, package_version = parse_requirement_line(finding.code_snippet)
-            if not package_name:
-                continue
-            package_id = _build_package_id("L1", "PyPI", package_name, package_version or "unknown")
-            if package_id in seen:
-                continue
-            seen.add(package_id)
-            records.append(
-                {
-                    "package_id": package_id,
-                    "source": "L1",
-                    "detected_at": _now_iso(),
-                    "name": package_name,
-                    "version": package_version or "unknown",
-                    "ecosystem": "PyPI",
-                    "severity": finding.severity,
-                    "status": "upgrade_required",
-                    "evidence": finding.code_snippet,
-                    "references": list(finding.references),
-                    "metadata": dict(finding.metadata),
-                }
-            )
-            continue
-
-        package_name = finding.metadata.get("package")
-        ecosystem = finding.metadata.get("ecosystem", "PyPI")
+        package_name, package_version = parse_requirement_line(finding.code_snippet)
         if not package_name:
             continue
-        package_id = _build_package_id("L1", ecosystem, package_name, "unknown")
+        package_id = _build_package_id("L1", "PyPI", package_name, package_version or "unknown")
         if package_id in seen:
             continue
         seen.add(package_id)
         records.append(
-            {
-                "package_id": package_id,
-                "source": "L1",
-                "detected_at": _now_iso(),
-                "name": package_name,
-                "version": "unknown",
-                "ecosystem": ecosystem,
-                "severity": finding.severity,
-                "status": "investigate",
-                "evidence": finding.code_snippet,
-                "references": list(finding.references),
-                "metadata": dict(finding.metadata),
-            }
+            PackageRecord(
+                package_id=package_id,
+                source="L1",
+                detected_at=_now_iso(),
+                name=package_name,
+                version=package_version or "unknown",
+                ecosystem="PyPI",
+                cve_id=finding.metadata.get("cve_id"),
+                severity=finding.severity,
+                cvss_score=finding.metadata.get("cvss_score"),
+                license=finding.metadata.get("license"),
+                license_risk=bool(finding.metadata.get("license_risk", False)),
+                status="upgrade_required",
+                fix_suggestion=_build_fix_suggestion(finding),
+                evidence=f"{finding.file_path}: {finding.code_snippet}" if finding.file_path else finding.code_snippet,
+            )
         )
 
     return records
