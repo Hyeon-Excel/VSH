@@ -345,10 +345,13 @@ class AnalysisPipeline(BasePipeline):
         return {
             "issue_id": suggestion.issue_id,
             "file_path": suggestion.file_path,
+            "rule_id": finding.rule_id,
             "cwe_id": finding.cwe_id,
             "severity": finding.severity,
             "line_number": finding.line_number,
             "code_snippet": finding.code_snippet,
+            "l1_reachability_status": finding.reachability_status,
+            "l1_references": list(finding.references),
             "original_code": suggestion.original_code or finding.code_snippet,
             "fixed_code": suggestion.fixed_code,
             "description": suggestion.description,
@@ -396,7 +399,7 @@ class AnalysisPipeline(BasePipeline):
             "fix_suggestions": [f.model_dump() for f in fix_suggestions],
             "is_clean": is_clean,
             "summary": self._build_run_summary(
-                integrated_scan_result.findings,
+                integrated_scan_result,
                 fix_suggestions,
                 retriever_status,
             ),
@@ -551,10 +554,13 @@ class AnalysisPipeline(BasePipeline):
         return {
             "issue_id": cls._build_issue_id(finding_file_path, finding.cwe_id, finding.line_number),
             "file_path": finding_file_path,
+            "rule_id": finding.rule_id,
             "cwe_id": finding.cwe_id,
             "severity": finding.severity,
             "line_number": finding.line_number,
             "code_snippet": finding.code_snippet,
+            "l1_reachability_status": finding.reachability_status,
+            "l1_references": list(finding.references),
             "original_code": finding.code_snippet,
             "fixed_code": "",
             "description": "L2 분석 실패로 수정 제안을 생성하지 못했습니다.",
@@ -748,15 +754,27 @@ class AnalysisPipeline(BasePipeline):
 
     @staticmethod
     def _build_run_summary(
-        findings: List[Vulnerability],
+        integrated_scan_result: ScanResult,
         fix_suggestions: List[FixSuggestion],
         retriever_status: Dict[str, str] | None = None,
     ) -> Dict[str, int | str]:
         # hyeonexcel 수정: summary는 이미 정규화된 suggestion을 집계만 해야 한다.
         # 여기서 suggestion을 다시 수정하면 반환 payload와 summary 집계 시점이 달라질 수 있다.
+        findings = integrated_scan_result.findings
         summary: Dict[str, int | str] = {
             "findings_total": len(findings),
             "fix_suggestions_total": len(fix_suggestions),
+            "l1_vuln_records_total": len(integrated_scan_result.vuln_records),
+            "l1_package_records_total": len(integrated_scan_result.package_records),
+            "annotation_preview_total": len(integrated_scan_result.annotated_files),
+            "l1_notes_total": len(integrated_scan_result.notes),
+            "rule_tagged_total": sum(1 for finding in findings if finding.rule_id),
+            "reachable_findings_total": sum(
+                1 for finding in findings if finding.reachability_status == "YES"
+            ),
+            "typosquatting_findings_total": sum(
+                1 for finding in findings if finding.cwe_id == "CWE-1104"
+            ),
             "code_findings_total": sum(1 for finding in findings if finding.cwe_id != "CWE-829"),
             "supply_chain_findings_total": sum(1 for finding in findings if finding.cwe_id == "CWE-829"),
             "code_fix_suggestions_total": sum(

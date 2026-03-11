@@ -90,4 +90,11 @@ def test_integrated_pipeline_exposes_l1_normalized_outputs(monkeypatch, tmp_path
     assert run_result["vuln_records"]
     assert run_result["package_records"]
     assert run_result["annotated_files"]
+    assert str(sample) in run_result["annotated_files"]
     assert "fix_suggestions" in run_result
+    assert run_result["summary"]["l1_vuln_records_total"] >= 2
+    assert run_result["summary"]["l1_package_records_total"] >= 1
+    assert run_result["summary"]["annotation_preview_total"] >= 1
+    assert run_result["summary"]["rule_tagged_total"] >= 2
+    assert run_result["summary"]["reachable_findings_total"] >= 1
+    assert run_result["summary"]["typosquatting_findings_total"] >= 1

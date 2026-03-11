@@ -323,6 +323,12 @@
                 }
 
                 const analysisItems = [
+                    renderAnalysisItem('L1 Rule ID', log.rule_id),
+                    renderAnalysisItem('L1 Reachability', log.l1_reachability_status),
+                    renderAnalysisItem(
+                        'L1 References',
+                        Array.isArray(log.l1_references) ? log.l1_references.join('\n') : '',
+                    ),
                     renderAnalysisItem('수정 설명', log.description),
                     renderAnalysisItem('Reachability', log.reachability),
                     renderAnalysisItem('KISA Reference', log.kisa_reference),
