@@ -28,9 +28,13 @@ def test_vsh_l1_scanner_detects_pattern_and_typosquatting(tmp_path):
     assert sql_finding.reachability_status == "YES"
     assert typo_finding.metadata["similar_to"] == "requests"
     assert len(result.vuln_records) >= 2
-    assert result.vuln_records[0]["source"] == "L1"
+    assert result.vuln_records[0].source == "L1"
+    assert result.vuln_records[0].kisa_ref
+    assert result.vuln_records[0].reachability_status == "unknown"
+    assert result.vuln_records[0].fix_suggestion
     assert result.package_records
-    assert any(record["name"] == "reqeusts" for record in result.package_records)
+    assert all(record.source == "L1" for record in result.package_records)
+    assert any(record.name == "requests" for record in result.package_records)
 
 
 def test_vsh_l1_scanner_can_build_annotation_preview(tmp_path):
@@ -89,6 +93,9 @@ def test_integrated_pipeline_exposes_l1_normalized_outputs(monkeypatch, tmp_path
     assert scan_only_result["annotated_files"]
     assert run_result["vuln_records"]
     assert run_result["package_records"]
+    assert run_result["vuln_records"][0]["kisa_ref"]
+    assert run_result["vuln_records"][0]["reachability_status"] == "unknown"
+    assert "fix_suggestion" in run_result["vuln_records"][0]
     assert run_result["annotated_files"]
     assert str(sample) in run_result["annotated_files"]
     assert "fix_suggestions" in run_result

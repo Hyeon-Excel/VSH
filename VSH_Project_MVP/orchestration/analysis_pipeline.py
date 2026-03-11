@@ -122,8 +122,8 @@ class AnalysisPipeline(BasePipeline):
         return {
             "file_path": file_path,
             "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
-            "vuln_records": integrated_scan_result.vuln_records,
-            "package_records": integrated_scan_result.package_records,
+            "vuln_records": [record.model_dump() for record in integrated_scan_result.vuln_records],
+            "package_records": [record.model_dump() for record in integrated_scan_result.package_records],
             "annotated_files": integrated_scan_result.annotated_files,
             "notes": integrated_scan_result.notes,
             "is_clean": integrated_scan_result.is_clean(),
@@ -392,8 +392,8 @@ class AnalysisPipeline(BasePipeline):
         return {
             "file_path": integrated_scan_result.file_path,
             "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
-            "vuln_records": integrated_scan_result.vuln_records,
-            "package_records": integrated_scan_result.package_records,
+            "vuln_records": [record.model_dump() for record in integrated_scan_result.vuln_records],
+            "package_records": [record.model_dump() for record in integrated_scan_result.package_records],
             "annotated_files": integrated_scan_result.annotated_files,
             "notes": integrated_scan_result.notes,
             "fix_suggestions": [f.model_dump() for f in fix_suggestions],
@@ -431,14 +431,14 @@ class AnalysisPipeline(BasePipeline):
 
     @staticmethod
     def _merge_vuln_records(scan_results: List[ScanResult]) -> List[Dict]:
-        merged: List[Dict] = []
+        merged: List = []
         seen: set[tuple[str | None, int | None, str | None]] = set()
         for result in scan_results:
             for record in result.vuln_records:
                 key = (
-                    record.get("file_path"),
-                    record.get("line_number"),
-                    record.get("cwe_id"),
+                    record.file_path,
+                    record.line_number,
+                    record.cwe_id,
                 )
                 if key in seen:
                     continue
@@ -448,11 +448,11 @@ class AnalysisPipeline(BasePipeline):
 
     @staticmethod
     def _merge_package_records(scan_results: List[ScanResult]) -> List[Dict]:
-        merged: List[Dict] = []
+        merged: List = []
         seen: set[str] = set()
         for result in scan_results:
             for record in result.package_records:
-                package_id = record.get("package_id")
+                package_id = record.package_id
                 if package_id in seen:
                     continue
                 if package_id:
