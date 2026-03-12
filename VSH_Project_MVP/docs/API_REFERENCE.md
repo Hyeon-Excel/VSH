@@ -28,12 +28,12 @@
 |--------|------|------|
 | `file_path` | `str \| None` | 취약점이 실제로 발견된 파일 경로 |
 | `cwe_id` | `str` | CWE ID (예: CWE-78) |
-| `severity` | `str` | 취약점 심각도 (**HIGH**, **MEDIUM**, **LOW** 중 하나) |
+| `severity` | `str` | 취약점 심각도 (**CRITICAL**, **HIGH**, **MEDIUM**, **LOW** 중 하나) |
 | `line_number` | `int` | 취약점이 발견된 라인 번호 |
 | `code_snippet` | `str` | 취약점이 포함된 코드 조각 |
 
 **Validation:**
-- `severity` 필드는 반드시 "HIGH", "MEDIUM", "LOW" 중 하나의 값이어야 하며, 그 외 입력 시 `ValueError`가 발생합니다.
+- `severity` 필드는 반드시 "CRITICAL", "HIGH", "MEDIUM", "LOW" 중 하나의 값이어야 하며, 그 외 입력 시 `ValueError`가 발생합니다.
 
 ---
 
