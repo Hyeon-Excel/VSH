@@ -1,75 +1,133 @@
 # Variables & Constants
 
-## Domain Model Constants
+## Severity
 
-### Severity Levels
-취약점의 심각도를 나타내며, `Vulnerability.severity` 필드에 사용됩니다.
+- `CRITICAL`
+- `HIGH`
+- `MEDIUM`
+- `LOW`
 
-- **HIGH**: 즉각적인 조치가 필요한 심각한 보안 위협 (예: Command Injection, SQL Injection)
-- **MEDIUM**: 잠재적인 보안 위협이나 조건부로 발생 가능한 취약점
-- **LOW**: 코드 품질이나 모범 사례 위반 수준의 경미한 이슈
+`severity`는 정성 등급이고, `cvss_score`는 참고용 수치다. 둘을 혼합해 판정하지 않는다.
 
-### Language Codes
-지원하는 언어 코드 목록 (`ScanResult.language` 필드 등에서 사용)
+## Language
 
-- **python**: Python 언어 (MVP 지원)
-- **c**: C 언어 (Post-MVP 예정)
-- **javascript**: JavaScript 언어 (Post-MVP 예정)
+현재 스캐너/공통 스키마에서 주로 사용하는 값:
 
----
+- `python`
+- `javascript`
+- `c`
 
-## Repository & Storage
+파이프라인은 파일 확장자 기준으로 기본 언어를 추론하고, 스캐너별 `ScanResult.language`를 그대로 유지한다.
 
-### Log Data Structure (log.json)
-`Pipeline` 실행 후 `LogRepo`에 영구 저장되는 데이터 구조입니다.
-- `issue_id`: 고유 식별자 (`{file_path}_{cwe_id}_{line_number}`)
-- `file_path`: 분석 대상 소스 파일 경로
-- `cwe_id`: 탐지된 취약점 유형
-- `severity`: "HIGH", "MEDIUM", "LOW"
-- `line_number`: 코드 라인 번호
-- `code_snippet`: L1에서 탐지된 의심 코드 한 줄
-- `original_code`: L2 분석 시 사용된 원본 전체 컨텍스트 (수정 전)
-- `fixed_code`: AI가 제안한 안전한 코드 (수정 후)
-- `status`: 현재 처리 상태 (`pending`, `accepted`, `dismissed`, `analysis_failed`)
-- `description`: L2가 생성한 수정 설명
-- `reachability`: L2가 판단한 실제 위협 도달 가능성 설명
-- `kisa_reference`: 연관된 KISA 또는 보안 기준 참조
-- `evidence_refs`: retrieval이 수집한 근거 참조 목록
-- `evidence_summary`: retrieval이 정리한 근거 요약
-- `registry_status`: registry verifier 결과 (`FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`)
-- `registry_summary`: registry verifier 상세 요약
-- `osv_status`: OSV verifier 결과 (`FOUND`, `NOT_FOUND`, `UNKNOWN`, `ERROR`)
-- `osv_summary`: OSV verifier 상세 요약
-- `verification_summary`: verifier 결과를 합친 최종 요약
-- `patch_status`: patch preview 생성 상태 (`GENERATED`, `NOT_GENERATED`)
-- `patch_summary`: patch 생성 결과 요약
-- `patch_diff`: unified diff 형식의 patch preview
-- `processing_trace`: 스캔부터 patch까지의 처리 단계 목록
-- `processing_summary`: 처리 경로를 한 줄로 요약한 문자열
-- `category`: finding 분류 (`code`, `supply_chain`)
-- `remediation_kind`: 수정 방식 분류 (`code_patch`, `version_bump_patch` 등)
-- `target_ref`: L3 handoff용 대상 식별자 (`file:line` 또는 `dependency:name`)
-- `analysis_error`: L2 분석 실패 시 저장되는 오류 메시지
+## Reachability
 
-### Status Allowed Values
-- **pending**: 분석 직후의 기본 상태
-- **accepted**: 사용자가 수정을 승인하고 코드를 복사한 상태
-- **dismissed**: 사용자가 오탐으로 판단하여 무시한 상태
-- **analysis_failed**: L2 분석이 실패하여 수정 제안을 생성하지 못한 상태
+공통 스키마와 현재 L1/L2는 아래 값을 사용한다.
 
----
+- `reachable`
+- `unreachable`
+- `unknown`
 
-## Dashboard UI & Interactions
+기존 `YES / NO / UNKNOWN`은 하위호환 입력으로만 처리한다.
 
-### Clipboard Copy Fallback
-대시보드 브라우저에서 `Accept` 클릭 시 `navigator.clipboard` API를 통한 자동 복사를 시도합니다. 만약 브라우저 보안 정책이나 권한 문제로 실패할 경우, 카드 하단에 읽기 전용 `textarea`를 노출하여 사용자가 수동으로 복사할 수 있게 합니다.
+## LLM Provider
 
-### Paths & Constants (config.py)
-- `KNOWLEDGE_PATH`: `mock_db/knowledge.json`
-- `FIX_PATH`: `mock_db/kisa_fix.json`
-- `PROJECT_ROOT`: 프로젝트 루트 디렉토리 (`pathlib.Path`)
+환경변수 `LLM_PROVIDER` 허용값:
 
-### Environment Variables (.env)
-- `LOG_PATH`: 분석 결과 로그 파일 경로 (`mock_db/log.json`)
-- `LLM_PROVIDER`: 사용할 AI 제공자 (`gemini`, `claude`, `mock`)
-- `DASHBOARD_PORT`: 대시보드 서버 포트 (기본값: 3000)
+- `mock`
+- `gemini`
+- `claude`
+
+실제 키:
+
+- `GEMINI_API_KEY`
+- `ANTHROPIC_API_KEY`
+
+## 로그 구조
+
+`mock_db/log.json`에 저장되는 로그는 UI/MCP 소비 편의를 위해 공통 스키마 키와 레거시 평탄화 키를 함께 가진다.
+
+핵심 키:
+
+- `issue_id`
+- `vuln_id`
+- `file_path`
+- `cwe_id`
+- `severity`
+- `line_number`
+- `code_snippet`
+- `status`
+- `description`
+- `fixed_code`
+- `l2_vuln_record`
+- `metadata`
+
+### `metadata.l2`
+
+L2 운영 필드는 `metadata.l2` 안에 저장된다.
+
+- `reachability_note`
+- `evidence_refs`
+- `evidence_summary`
+- `retrieval_backend`
+- `chroma_status`
+- `chroma_summary`
+- `chroma_hits`
+- `registry_status`
+- `registry_summary`
+- `osv_status`
+- `osv_summary`
+- `verification_summary`
+- `decision_status`
+- `confidence_score`
+- `confidence_reason`
+- `patch_status`
+- `patch_summary`
+- `patch_diff`
+- `processing_trace`
+- `processing_summary`
+- `category`
+- `remediation_kind`
+- `target_ref`
+
+### 로그 호환 키
+
+현재 로그는 기존 대시보드/도구 호환을 위해 아래 평탄화 키도 유지한다.
+
+- `kisa_reference`
+- `reachability`
+- `evidence_refs`
+- `retrieval_backend`
+- `decision_status`
+- `confidence_score`
+- `patch_diff`
+- `category`
+
+공식 직렬화 기준은 `FixSuggestion.metadata.l2`와 `l2_vuln_record`다.
+
+## Path / Config
+
+`config.py` 기준 주요 상수:
+
+- `PROJECT_ROOT`
+- `KNOWLEDGE_PATH`
+- `FIX_PATH`
+- `LOG_PATH`
+- `CHROMA_DB_PATH`
+- `CHROMA_COLLECTION_NAME`
+
+## MCP Tool Names
+
+공개 계약:
+
+- `validate_code`
+- `scan_only`
+- `get_results`
+- `apply_fix`
+- `dismiss_issue`
+- `get_log`
+
+레거시 호환 이름:
+
+- `scan_file`
+- `get_report`
+- `update_status`

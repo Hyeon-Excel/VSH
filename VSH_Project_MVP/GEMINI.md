@@ -1,124 +1,149 @@
-﻿# GEMINI.md — Security MCP 프로젝트 컨텍스트
+# GEMINI.md
 
 ## 프로젝트 개요
-Security MCP는 다양한 언어(MVP: Python)의 코드 보안 취약점을 자동 분석하고,
-Claude AI가 수정 제안까지 해주는 도구다.
-Tree-sitter 라이브러리를 활용한 AST 파싱과 Semgrep 정적 분석을 조합하여
-언어에 관계없이 확장 가능한 구조로 설계되었다.
 
----
+VSH는 소스 코드 보안 취약점을 탐지하고, 근거를 보강하고, 수정 제안까지 반환하는 보안 분석 도구다.
 
-## 아키텍처 레이어 구조
+현재 구조는 아래 3계층을 기준으로 본다.
 
-Interface Layer     → tools/       (MCP 툴 등록, 위임만 담당)
-Orchestration Layer → pipeline/    (L1→L2 흐름 제어)
-Execution Layer     → modules/     (실제 스캔/분석 실행)
-Data Layer          → repository/  (DB 접근 추상화)
-Domain Model        → models/      (데이터 구조 정의)
+- L1: 탐지
+- L2: 분석 / 판단 / 수정 제안
+- L3: 심층 검증 / 리포팅
 
----
+## 현재 아키텍처 기준
 
-## 폴더 구조
+```text
+Interface Layer     -> interfaces/
+Orchestration Layer -> orchestration/
+Execution Layer     -> layer1/, layer2/
+Data Layer          -> repository/
+Shared Contract     -> shared/
+Domain Model        -> models/
+```
 
-VSH_Project/
-├── mcp_server.py
-├── tools/
-│   ├── analysis_tools.py
-│   ├── dashboard_tools.py
-│   └── status_tools.py
-├── pipeline/
-│   ├── base_pipeline.py
-│   ├── analysis_pipeline.py
-│   └── pipeline_factory.py
-├── modules/
-│   ├── base_module.py
-│   ├── scanner/
-│   │   ├── semgrep_scanner.py
-│   │   ├── treesitter_scanner.py
-│   │   └── sbom_scanner.py
-│   └── analyzer/
-│       └── llm_analyzer.py
-├── repository/
-│   ├── base_repository.py
-│   ├── knowledge_repo.py
-│   ├── fix_repo.py
-│   └── log_repo.py
+`modules/`, `pipeline/`, `tools/`는 기존 import 호환용 wrapper다.
+
+## 현재 폴더 구조
+
+```text
+VSH_Project_MVP/
+├── shared/
+│   ├── contracts.py
+│   └── finding_dedup.py
 ├── models/
+│   ├── common_schema.py
 │   ├── scan_result.py
 │   ├── vulnerability.py
 │   └── fix_suggestion.py
-├── mock_db/
-│   ├── knowledge.json
-│   ├── kisa_fix.json
-│   └── log.json
-└── dashboard/
-    ├── app.py
-    └── index.html
+├── layer1/
+│   ├── scanner/
+│   └── common/
+├── layer2/
+│   ├── analyzer/
+│   ├── retriever/
+│   ├── verifier/
+│   ├── common/
+│   └── patch_builder.py
+├── orchestration/
+│   ├── base_pipeline.py
+│   ├── analysis_pipeline.py
+│   └── pipeline_factory.py
+├── interfaces/
+│   └── mcp/server.py
+├── repository/
+├── dashboard/
+├── modules/
+├── pipeline/
+└── tools/
+```
 
----
+## 설계 원칙
 
-## 설계 원칙 (절대 위반 금지)
+1. SRP를 유지한다.
+2. 새 구현은 가능하면 wrapper가 아닌 실제 구현 경로에 추가한다.
+3. `interfaces/`는 `orchestration/`만 호출한다.
+4. `layer1/`, `layer2/`는 `models/`와 `shared/` 계약을 기준으로 통신한다.
+5. 레이어 간 공유 record는 `models/common_schema.py`를 우선 기준으로 본다.
 
-1. SRP — 각 클래스/모듈은 하나의 책임만 가진다
-2. OCP — 새 기능 추가 시 기존 코드 수정 없이 구현체만 추가한다
-3. DIP — 구체 구현이 아닌 추상 클래스에 의존한다
-4. 의존성 방향은 항상 위에서 아래로만 흐른다 (역방향 금지)
-5. tools/ 는 pipeline/ 에만 의존한다. modules/ 를 직접 호출하지 않는다
-6. 모든 반환 타입은 models/ 의 도메인 모델을 사용한다
+## 현재 핵심 계약
 
----
+### BaseScanner
 
-## 확정된 인터페이스 이름 (변경 금지)
+```python
+scan(file_path: str) -> ScanResult
+supported_languages() -> list[str]
+```
 
-### 추상 클래스 메서드
-BaseScanner.scan(file_path: str) -> ScanResult
-BaseScanner.supported_languages() -> list[str]
-BaseRepository.find_by_id(id: str) -> dict
-BaseRepository.save(data: dict) -> bool
-BasePipeline.run(file_path: str) -> dict
+### BaseAnalyzer
 
-### MCP 툴 이름
-validate_code(file_path: str) -> dict
-scan_only(file_path: str) -> dict
-get_results() -> dict
-apply_fix(issue_id: str) -> dict
-dismiss_issue(issue_id: str) -> dict
-get_log(file_path: str) -> dict
+```python
+analyze(
+    scan_result: ScanResult,
+    knowledge: list[dict],
+    fix_hints: list[dict],
+    evidence_map: dict[str, dict] | None = None,
+) -> list[FixSuggestion]
+```
 
-### Domain Model 핵심 필드
-ScanResult.file_path
-ScanResult.language
-ScanResult.findings
+### MCP Tool
 
-Vulnerability.cwe_id
-Vulnerability.severity
-Vulnerability.line_number
-Vulnerability.code_snippet
+- `validate_code`
+- `scan_only`
+- `get_results`
+- `apply_fix`
+- `dismiss_issue`
+- `get_log`
 
-FixSuggestion.issue_id
-FixSuggestion.original_code
-FixSuggestion.fixed_code
-FixSuggestion.description
+## 현재 모델 기준
 
----
+### ScanResult
 
-## 코딩 컨벤션
+- `findings`
+- `vuln_records`
+- `package_records`
+- `annotated_files`
+- `notes`
 
-- 타입 힌트 필수
-- 추상 클래스는 ABC 사용
-- 모든 public 메서드에 docstring 필수
-- 예외는 반드시 try/except로 처리하고 로그 남기기
-- 환경변수는 .env 파일에서만 읽기 (python-dotenv 사용)
+### Vulnerability
 
----
+- `cwe_id`
+- `severity`
+- `line_number`
+- `code_snippet`
+- `rule_id`
+- `reachability_status`
+- `references`
+- `metadata`
 
-## MVP 범위
+### FixSuggestion
 
-포함: L1 (Semgrep + Tree-sitter + SBOM Mock) + L2 (Claude API) + Dashboard + FastMCP
-제외: L3 (SonarQube, PoC, 리포트), 실제 Vector DB, VS Code Extension
+공통 필드:
 
----
+- `vuln_id`
+- `file_path`
+- `cwe_id`
+- `line_number`
+- `kisa_ref`
+- `evidence`
+- `fix_suggestion`
+- `status`
 
-## 현재 진행 상태
+L2 운영 필드:
 
-PROGRESS.md 참고
+- `metadata.l2.*`
+
+legacy 이름인 `issue_id`, `kisa_reference` 등은 property 호환만 제공한다.
+
+## 현재 구현 상태
+
+- L2 retrieval / verification / confidence / patch / MCP 정렬 완료
+- L1 통합 scanner와 공통 스키마 정렬 1차 완료
+- `FixSuggestion`을 공통 필드 + `metadata.l2` 구조로 정리 완료
+- 공용 deduplicate 기준 도입 완료
+
+자세한 진행 상태는 아래 문서를 본다.
+
+- `PROGRESS.md`
+- `docs/FLOW.md`
+- `docs/API_REFERENCE.md`
+- 루트 진행 문서: `../docs/L1_L2_INTEGRATION_PROGRESS.md`

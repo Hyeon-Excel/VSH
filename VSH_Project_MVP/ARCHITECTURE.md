@@ -33,6 +33,7 @@
 ### Domain Model (`models/`)
 - 레이어 간 데이터 전달에 사용되는 데이터 구조
 - 모든 레이어가 이 모델을 기준으로 통신
+- `severity`는 현재 `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` 4단계를 허용
 
 ### Compatibility Layer (`modules/`, `pipeline/`, `tools/`)
 - 기존 경로를 쓰는 코드가 깨지지 않도록 wrapper 유지

@@ -41,33 +41,17 @@ L1-L2 통합 과정에서 공통 스키마와 현재 구현 사이에 남아 있
 
 ### 현재 상태
 
-- `FixSuggestion`은 아직 L2 내부 운영 모델이다.
-- 필드명과 구조가 공통 스키마와 다르다.
-  - `issue_id`
-  - `kisa_reference`
-  - `reachability` (자연어 설명)
-  - `category`
-  - `patch_diff`
-  - `confidence_score`
-  - `processing_trace`
-
-### 왜 조율이 필요한가
-
-- 현재 L1 normalized output은 공통 스키마 기준으로 맞추기 시작했지만,
-  L2 결과 모델까지 한 번에 바꾸면 영향 범위가 크다.
-- 따라서 "L2 출력도 바로 공통 스키마 본체로 바꿀지", 아니면
-  "공통 필드 + L2 전용 metadata" 구조로 단계 전환할지를 먼저 정해야 한다.
-
-### 권고 방향
-
-- 공통 필드:
+- `FixSuggestion`은 여전히 L2 내부 운영 모델이지만,
+  현재는 공통 필드와 `metadata.l2`를 함께 가지는 구조로 1차 전환이 끝난 상태다.
+- 공통 필드로 정리된 값:
   - `vuln_id`
   - `kisa_ref`
   - `reachability_status`
+  - `reachability_confidence`
+  - `evidence`
   - `fix_suggestion`
   - `status`
-  - `evidence`
-- L2 전용 필드:
+- L2 전용 운영 값은 `metadata.l2`에 들어간다.
   - `confidence_score`
   - `confidence_reason`
   - `patch_diff`
@@ -76,21 +60,31 @@ L1-L2 통합 과정에서 공통 스키마와 현재 구현 사이에 남아 있
   - `chroma_status`
   - `registry_status`
   - `osv_status`
+- `issue_id`, `kisa_reference`, `reachability` 같은 예전 이름은 현재 property 호환만 제공한다.
 
-즉, 공통 스키마 필드는 공통 이름으로 맞추고, L2 전용 값은 `metadata.l2` 같은 확장 블록으로 분리하는 방향이 가장 안전하다.
+### 왜 조율이 필요한가
+
+- `FixSuggestion` 자체는 이미 공통 필드 + metadata 구조로 옮기기 시작했지만,
+  어디까지를 레거시 호환으로 유지할지와 외부 표면에서 flat 키를 언제 걷을지는 아직 정해야 한다.
+- 즉, 지금 남은 쟁점은 "전환 여부"가 아니라
+  "legacy 호환을 언제 제거할지"와 "로그/MCP 표면도 metadata 중심으로 얼마나 빨리 정리할지"에 가깝다.
+
+### 권고 방향
+
+- 현재 방향은 유지한다.
+- 즉, 공통 스키마 필드는 공통 이름으로 맞추고, L2 전용 값은 `metadata.l2` 같은 확장 블록으로 분리한다.
+- 남은 작업은 이 구조를 기준으로 로그, 대시보드, MCP가 언제까지 레거시 키를 병행할지 정하는 것이다.
 
 ## 항목 3. 후속 구현 순서
 
 팀 합의 후에는 아래 순서로 반영한다.
 
 1. `PackageRecord.source` 정책 확정
-2. `FixSuggestion`의 공통 필드와 L2 전용 필드 분리 기준 확정
-3. `models/common_schema.py` 최종 반영
-4. `layer1/common/schema_normalizer.py`와 `ScanResult` 출력 계약 재정리
-5. `FixSuggestion` -> 공통 스키마/metadata 구조 전환
-6. 로그, 대시보드, MCP 계약 테스트 갱신
+2. `FixSuggestion` 레거시 호환 필드 제거 시점 확정
+3. `models/common_schema.py` 정책 최종 반영
+4. 로그, 대시보드, MCP 표면에서 legacy flat 키 제거 시점 정리
 
 ## 메모
 
-- 현재 상태는 "통합을 위한 1차 적용" 단계다.
-- 즉시 동작에는 문제 없지만, 공통 스키마를 팀 전체 기준으로 고정하려면 위 두 항목은 반드시 합의가 필요하다.
+- 현재 상태는 "공통 스키마 1차 적용 + legacy 호환 유지" 단계다.
+- 즉시 동작에는 문제 없지만, 공통 스키마를 팀 전체 기준으로 고정하려면 위 두 항목은 여전히 합의가 필요하다.
