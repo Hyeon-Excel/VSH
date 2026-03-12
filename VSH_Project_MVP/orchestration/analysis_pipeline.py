@@ -82,6 +82,7 @@ class AnalysisPipeline(BasePipeline):
         if analysis_error:
             self._save_analysis_failure_logs(
                 file_path=file_path,
+                scan_result=integrated_scan_result,
                 findings=integrated_scan_result.findings,
                 evidence_map=evidence_map,
                 verification_map=verification_map,
@@ -91,7 +92,7 @@ class AnalysisPipeline(BasePipeline):
         else:
             fix_suggestions = self._normalize_and_save_suggestions(
                 file_path=file_path,
-                findings=integrated_scan_result.findings,
+                scan_result=integrated_scan_result,
                 raw_suggestions=raw_fix_suggestions,
                 evidence_map=evidence_map,
                 verification_map=verification_map,
@@ -218,6 +219,7 @@ class AnalysisPipeline(BasePipeline):
     def _save_analysis_failure_logs(
         self,
         file_path: str,
+        scan_result: ScanResult,
         findings: List[Vulnerability],
         evidence_map: Dict[str, Dict],
         verification_map: Dict[str, Dict],
@@ -229,6 +231,7 @@ class AnalysisPipeline(BasePipeline):
             self.log_repo.save(
                 self._build_analysis_failure_log(
                     default_file_path=file_path,
+                    scan_result=scan_result,
                     finding=finding,
                     evidence_context=evidence_context,
                     verification_context=verification_context,
@@ -239,7 +242,7 @@ class AnalysisPipeline(BasePipeline):
     def _normalize_and_save_suggestions(
         self,
         file_path: str,
-        findings: List[Vulnerability],
+        scan_result: ScanResult,
         raw_suggestions: List[FixSuggestion],
         evidence_map: Dict[str, Dict],
         verification_map: Dict[str, Dict],
@@ -249,7 +252,7 @@ class AnalysisPipeline(BasePipeline):
         for suggestion in raw_suggestions:
             matching_vuln = self._find_matching_vulnerability(
                 file_path=file_path,
-                findings=findings,
+                findings=scan_result.findings,
                 suggestion=suggestion,
             )
             if not matching_vuln:
@@ -263,7 +266,17 @@ class AnalysisPipeline(BasePipeline):
                 evidence_map=evidence_map,
                 verification_map=verification_map,
             )
-            self.log_repo.save(self._build_log_data(matching_vuln, normalized_suggestion))
+            l2_vuln_record = next(
+                iter(build_l2_vuln_records(scan_result, [normalized_suggestion])),
+                None,
+            )
+            self.log_repo.save(
+                self._build_log_data(
+                    matching_vuln,
+                    normalized_suggestion,
+                    l2_vuln_record.model_dump() if l2_vuln_record else None,
+                )
+            )
             normalized_suggestions.append(normalized_suggestion)
 
         return normalized_suggestions
@@ -344,10 +357,15 @@ class AnalysisPipeline(BasePipeline):
         )
 
     @staticmethod
-    def _build_log_data(finding: Vulnerability, suggestion: FixSuggestion) -> dict:
+    def _build_log_data(
+        finding: Vulnerability,
+        suggestion: FixSuggestion,
+        l2_vuln_record: dict | None = None,
+    ) -> dict:
         return {
             "issue_id": suggestion.issue_id,
             "file_path": suggestion.file_path,
+            "l2_vuln_record": l2_vuln_record,
             "rule_id": finding.rule_id,
             "cwe_id": finding.cwe_id,
             "severity": finding.severity,
@@ -554,15 +572,51 @@ class AnalysisPipeline(BasePipeline):
     def _build_analysis_failure_log(
         cls,
         default_file_path: str,
+        scan_result: ScanResult,
         finding: Vulnerability,
         evidence_context: dict,
         verification_context: dict,
         error_message: str,
     ) -> dict:
         finding_file_path = cls._resolve_finding_file_path(finding, default_file_path)
+        placeholder_suggestion = FixSuggestion(
+            issue_id=cls._build_issue_id(finding_file_path, finding.cwe_id, finding.line_number),
+            file_path=finding_file_path,
+            cwe_id=finding.cwe_id,
+            line_number=finding.line_number,
+            original_code=finding.code_snippet,
+            fixed_code="",
+            description="L2 분석 실패로 수정 제안을 생성하지 못했습니다.",
+            evidence_refs=evidence_context.get("evidence_refs", []),
+            evidence_summary=evidence_context.get("evidence_summary"),
+            retrieval_backend=evidence_context.get("retrieval_backend"),
+            chroma_status=evidence_context.get("chroma_status"),
+            chroma_summary=evidence_context.get("chroma_summary"),
+            chroma_hits=evidence_context.get("chroma_hits", 0),
+            kisa_reference=evidence_context.get("primary_reference"),
+            registry_status=verification_context.get("registry_status"),
+            registry_summary=verification_context.get("registry_summary"),
+            osv_status=verification_context.get("osv_status"),
+            osv_summary=verification_context.get("osv_summary"),
+            verification_summary=verification_context.get("verification_summary"),
+            decision_status="analysis_failed",
+            confidence_score=0,
+            confidence_reason="L2 분석 실패로 신뢰도를 계산하지 못했습니다.",
+            category=cls._classify_category(finding.cwe_id),
+            target_ref=cls._build_target_ref(
+                finding_file_path,
+                finding,
+                cls._classify_category(finding.cwe_id),
+            ),
+        )
+        l2_vuln_record = next(
+            iter(build_l2_vuln_records(scan_result, [placeholder_suggestion])),
+            None,
+        )
         return {
             "issue_id": cls._build_issue_id(finding_file_path, finding.cwe_id, finding.line_number),
             "file_path": finding_file_path,
+            "l2_vuln_record": l2_vuln_record.model_dump() if l2_vuln_record else None,
             "rule_id": finding.rule_id,
             "cwe_id": finding.cwe_id,
             "severity": finding.severity,

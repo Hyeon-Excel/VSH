@@ -50,6 +50,7 @@ class FakePipeline:
             "file_path": file_path,
             "scan_results": [{"cwe_id": "CWE-89"}],
             "vuln_records": [{"vuln_id": "VSH-001"}],
+            "l2_vuln_records": [{"vuln_id": "VSH-001", "source": "L2"}],
             "package_records": [{"package_id": "PKG-001"}],
             "annotated_files": {file_path: "# preview"},
             "notes": ["layer=L1"],
@@ -133,8 +134,10 @@ def test_server_documented_tools_follow_expected_contract(monkeypatch):
 
     assert validate_result["file_path"] == "tests/sample.py"
     assert "fix_suggestions" in validate_result
+    assert validate_result["l2_vuln_records"] == [{"vuln_id": "VSH-001", "source": "L2"}]
     assert scan_only_result["file_path"] == "tests/sample.py"
     assert "fix_suggestions" not in scan_only_result
+    assert "l2_vuln_records" not in scan_only_result
     assert scan_only_result["vuln_records"] == [{"vuln_id": "VSH-001"}]
     assert scan_only_result["package_records"] == [{"package_id": "PKG-001"}]
     assert scan_only_result["annotated_files"] == {"tests/sample.py": "# preview"}

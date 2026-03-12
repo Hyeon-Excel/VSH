@@ -226,6 +226,9 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert len(log_repo.saved) == 1
     assert log_repo.saved[0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
     assert log_repo.saved[0]["file_path"] == str(vulnerable_file)
+    assert log_repo.saved[0]["l2_vuln_record"]["source"] == "L2"
+    assert log_repo.saved[0]["l2_vuln_record"]["cwe_id"] == "CWE-89"
+    assert log_repo.saved[0]["l2_vuln_record"]["kisa_ref"] == "KISA DB-01"
     assert log_repo.saved[0]["description"] == "Use parameter binding instead of string interpolation."
     assert log_repo.saved[0]["reachability"] == "User input is directly reachable from the sink."
     assert log_repo.saved[0]["kisa_reference"] == "KISA DB-01"
@@ -256,6 +259,7 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     assert log_repo.saved[0]["processing_summary"]
     assert result["summary"]["findings_total"] == 1
     assert result["summary"]["patch_generated_total"] == 1
+    assert result["summary"]["l2_vuln_records_total"] == 1
     assert result["summary"]["chroma_status"] == "MISSING_DEPENDENCY"
     assert result["summary"]["retrieval_static_only_total"] == 1
     assert result["summary"]["chroma_enriched_total"] == 0
