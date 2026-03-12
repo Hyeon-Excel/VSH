@@ -93,14 +93,19 @@ def test_integrated_pipeline_exposes_l1_normalized_outputs(monkeypatch, tmp_path
     assert scan_only_result["annotated_files"]
     assert run_result["vuln_records"]
     assert run_result["package_records"]
+    assert run_result["l2_vuln_records"]
     assert run_result["vuln_records"][0]["kisa_ref"]
     assert run_result["vuln_records"][0]["reachability_status"] == "unknown"
     assert "fix_suggestion" in run_result["vuln_records"][0]
+    assert run_result["l2_vuln_records"][0]["source"] == "L2"
+    assert run_result["l2_vuln_records"][0]["vuln_id"]
+    assert run_result["l2_vuln_records"][0]["fix_suggestion"]
     assert run_result["annotated_files"]
     assert str(sample) in run_result["annotated_files"]
     assert "fix_suggestions" in run_result
     assert run_result["summary"]["l1_vuln_records_total"] >= 2
     assert run_result["summary"]["l1_package_records_total"] >= 1
+    assert run_result["summary"]["l2_vuln_records_total"] >= 2
     assert run_result["summary"]["annotation_preview_total"] >= 1
     assert run_result["summary"]["rule_tagged_total"] >= 2
     assert run_result["summary"]["reachable_findings_total"] >= 1

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from .base_pipeline import BasePipeline
 from shared.contracts import BaseScanner, BaseAnalyzer
+from layer2.common.schema_mapper import build_l2_vuln_records
 from layer2.patch_builder import PatchBuilder
 from layer2.retriever.evidence_retriever import EvidenceRetriever
 from layer2.verifier.registry_verifier import RegistryVerifier
@@ -51,12 +52,13 @@ class AnalysisPipeline(BasePipeline):
                 language=self._infer_language(file_path),
                 findings=[],
             )
-            return self._build_run_result(empty_result, [], True, retriever_status)
+            return self._build_run_result(empty_result, [], [], True, retriever_status)
 
         integrated_scan_result = self._build_integrated_scan_result(file_path)
         if integrated_scan_result.is_clean():
             return self._build_run_result(
                 integrated_scan_result,
+                [],
                 [],
                 True,
                 retriever_status,
@@ -98,6 +100,7 @@ class AnalysisPipeline(BasePipeline):
         return self._build_run_result(
             integrated_scan_result=integrated_scan_result,
             fix_suggestions=fix_suggestions,
+            l2_vuln_records=build_l2_vuln_records(integrated_scan_result, fix_suggestions),
             is_clean=False,
             retriever_status=retriever_status,
         )
@@ -386,14 +389,19 @@ class AnalysisPipeline(BasePipeline):
         self,
         integrated_scan_result: ScanResult,
         fix_suggestions: List[FixSuggestion],
+        l2_vuln_records: List | None,
         is_clean: bool,
         retriever_status: Dict[str, str],
     ) -> dict:
+        serialized_l2_vuln_records = [
+            record.model_dump() for record in (l2_vuln_records or [])
+        ]
         return {
             "file_path": integrated_scan_result.file_path,
             "scan_results": [v.model_dump() for v in integrated_scan_result.findings],
             "vuln_records": [record.model_dump() for record in integrated_scan_result.vuln_records],
             "package_records": [record.model_dump() for record in integrated_scan_result.package_records],
+            "l2_vuln_records": serialized_l2_vuln_records,
             "annotated_files": integrated_scan_result.annotated_files,
             "notes": integrated_scan_result.notes,
             "fix_suggestions": [f.model_dump() for f in fix_suggestions],
@@ -401,6 +409,7 @@ class AnalysisPipeline(BasePipeline):
             "summary": self._build_run_summary(
                 integrated_scan_result,
                 fix_suggestions,
+                serialized_l2_vuln_records,
                 retriever_status,
             ),
         }
@@ -756,6 +765,7 @@ class AnalysisPipeline(BasePipeline):
     def _build_run_summary(
         integrated_scan_result: ScanResult,
         fix_suggestions: List[FixSuggestion],
+        l2_vuln_records: List[Dict] | None = None,
         retriever_status: Dict[str, str] | None = None,
     ) -> Dict[str, int | str]:
         # hyeonexcel 수정: summary는 이미 정규화된 suggestion을 집계만 해야 한다.
@@ -766,6 +776,7 @@ class AnalysisPipeline(BasePipeline):
             "fix_suggestions_total": len(fix_suggestions),
             "l1_vuln_records_total": len(integrated_scan_result.vuln_records),
             "l1_package_records_total": len(integrated_scan_result.package_records),
+            "l2_vuln_records_total": len(l2_vuln_records or []),
             "annotation_preview_total": len(integrated_scan_result.annotated_files),
             "l1_notes_total": len(integrated_scan_result.notes),
             "rule_tagged_total": sum(1 for finding in findings if finding.rule_id),

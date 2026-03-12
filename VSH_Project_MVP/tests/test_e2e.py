@@ -55,6 +55,7 @@ def test_e2e_scan_vulnerable_file(pipeline):
     assert result["is_clean"] is False
     assert len(result["scan_results"]) > 0
     assert len(result["fix_suggestions"]) > 0
+    assert len(result["l2_vuln_records"]) > 0
     
     cwe_ids = [v["cwe_id"] for v in result["scan_results"]]
     assert "CWE-89" in cwe_ids, f"CWE-89 탐지 실패. 현재 탐지: {cwe_ids}"
@@ -85,6 +86,7 @@ def test_e2e_scan_vulnerable_file(pipeline):
     assert supply_chain["confidence_score"] >= 85
     assert supply_chain.get("confidence_reason"), "confidence_reason이 비어있습니다."
     assert result["summary"]["findings_total"] >= 1
+    assert result["summary"]["l2_vuln_records_total"] >= 1
     assert result["summary"]["supply_chain_findings_total"] >= 1
     assert result["summary"]["patch_generated_total"] >= 1
     assert result["summary"]["decision_confirmed_total"] >= 1
