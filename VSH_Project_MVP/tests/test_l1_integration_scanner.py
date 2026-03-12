@@ -1,5 +1,7 @@
+from models.vulnerability import Vulnerability
 from orchestration.pipeline_factory import PipelineFactory
 from layer1.scanner import VSHL1Scanner
+from shared.finding_dedup import deduplicate_findings
 
 
 def test_vsh_l1_scanner_detects_pattern_and_typosquatting(tmp_path):
@@ -110,3 +112,40 @@ def test_integrated_pipeline_exposes_l1_normalized_outputs(monkeypatch, tmp_path
     assert run_result["summary"]["rule_tagged_total"] >= 2
     assert run_result["summary"]["reachable_findings_total"] >= 1
     assert run_result["summary"]["typosquatting_findings_total"] >= 1
+
+
+def test_deduplicate_findings_merges_metadata_without_losing_signal():
+    first = Vulnerability(
+        file_path="sample.py",
+        rule_id="RULE-1",
+        cwe_id="CWE-89",
+        severity="MEDIUM",
+        line_number=10,
+        code_snippet="cursor.execute(query)",
+        reachability_status="unknown",
+        references=["KISA-1"],
+        metadata={"scanner": "pattern"},
+    )
+    second = Vulnerability(
+        file_path="sample.py",
+        rule_id=None,
+        cwe_id="CWE-89",
+        severity="HIGH",
+        line_number=10,
+        code_snippet="cursor.execute(query % user_input)",
+        reachability_status="reachable",
+        references=["OWASP-A03"],
+        metadata={"source": "tree-sitter"},
+    )
+
+    merged = deduplicate_findings([first, second])
+
+    assert len(merged) == 1
+    finding = merged[0]
+    assert finding.rule_id == "RULE-1"
+    assert finding.severity == "HIGH"
+    assert finding.reachability_status == "reachable"
+    assert finding.references == ["KISA-1", "OWASP-A03"]
+    assert finding.metadata["scanner"] == "pattern"
+    assert finding.metadata["source"] == "tree-sitter"
+    assert finding.code_snippet == "cursor.execute(query % user_input)"

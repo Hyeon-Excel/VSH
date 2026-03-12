@@ -5,6 +5,7 @@ from models.fix_suggestion import FixSuggestion
 from models.scan_result import ScanResult
 from models.vulnerability import Vulnerability
 from pipeline.analysis_pipeline import AnalysisPipeline
+from shared.finding_dedup import deduplicate_findings
 
 
 class DummyScanner:
@@ -464,7 +465,7 @@ def test_deduplicate_keeps_findings_from_different_files():
         ),
     ]
 
-    deduplicated = AnalysisPipeline._deduplicate(findings)
+    deduplicated = deduplicate_findings(findings)
 
     assert len(deduplicated) == 2
 

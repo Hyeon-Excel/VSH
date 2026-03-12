@@ -7,6 +7,7 @@ from models.scan_result import ScanResult
 from models.vulnerability import Vulnerability
 from repository.base_repository import BaseReadRepository
 from shared.contracts import BaseScanner
+from shared.finding_dedup import deduplicate_findings
 
 from layer1.common import (
     annotate_files,
@@ -59,7 +60,7 @@ class VSHL1Scanner(BaseScanner):
 
         findings.extend(scan_file_with_patterns(file_path))
         findings.extend(detect_typosquatting_findings(file_path))
-        findings = annotate_reachability(file_path, self._deduplicate(findings))
+        findings = annotate_reachability(file_path, deduplicate_findings(findings))
 
         if language == "python":
             findings.extend(self.sbom_scanner.scan(file_path).findings)
@@ -67,7 +68,7 @@ class VSHL1Scanner(BaseScanner):
         result = ScanResult(
             file_path=file_path,
             language=language,
-            findings=self._deduplicate(findings),
+            findings=deduplicate_findings(findings),
         )
         return normalize_scan_result(result)
 
@@ -81,21 +82,3 @@ class VSHL1Scanner(BaseScanner):
         """
         result.annotated_files = annotate_files(result.findings)
         return result
-
-    @staticmethod
-    def _deduplicate(findings: List[Vulnerability]) -> List[Vulnerability]:
-        unique: List[Vulnerability] = []
-        seen: set[tuple[str | None, str | None, str, int, str]] = set()
-        for finding in findings:
-            key = (
-                finding.file_path,
-                finding.rule_id,
-                finding.cwe_id,
-                finding.line_number,
-                finding.code_snippet,
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            unique.append(finding)
-        return unique
