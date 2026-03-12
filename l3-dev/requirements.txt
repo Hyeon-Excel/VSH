@@ -1,0 +1,15 @@
+# VSH L3 Cold Path — Python 패키지
+# 설치: pip install -r requirements.txt
+
+# 테스트
+pytest>=8.3.5
+pytest-asyncio>=1.3.0
+
+# HTTP 요청 (Week 2: OSV API 호출)
+requests>=2.32.3
+
+# 타입 힌트 호환성
+typing-extensions>=4.15.0
+
+# MCP 서버 (Week 4)
+fastmcp>=3.1.0
