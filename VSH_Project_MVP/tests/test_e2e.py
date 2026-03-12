@@ -63,28 +63,32 @@ def test_e2e_scan_vulnerable_file(pipeline):
     
     for suggestion in result["fix_suggestions"]:
         assert suggestion.get("fixed_code"), "fixed_code가 비어있습니다."
-        assert suggestion.get("evidence_refs"), "evidence_refs가 비어있습니다."
-        assert suggestion.get("evidence_summary"), "evidence_summary가 비어있습니다."
-        assert suggestion.get("retrieval_backend"), "retrieval_backend가 비어있습니다."
-        assert suggestion.get("chroma_status"), "chroma_status가 비어있습니다."
-        assert suggestion.get("decision_status"), "decision_status가 비어있습니다."
-        assert "confidence_score" in suggestion, "confidence_score가 누락되었습니다."
-        assert suggestion.get("confidence_reason"), "confidence_reason이 비어있습니다."
+        assert suggestion.get("vuln_id"), "vuln_id가 비어있습니다."
+        metadata = suggestion.get("metadata", {}).get("l2", {})
+        assert metadata, "metadata.l2가 비어있습니다."
+        assert metadata.get("evidence_refs"), "metadata.l2.evidence_refs가 비어있습니다."
+        assert metadata.get("evidence_summary"), "metadata.l2.evidence_summary가 비어있습니다."
+        assert metadata.get("retrieval_backend"), "metadata.l2.retrieval_backend가 비어있습니다."
+        assert metadata.get("chroma_status"), "metadata.l2.chroma_status가 비어있습니다."
+        assert metadata.get("decision_status"), "metadata.l2.decision_status가 비어있습니다."
+        assert "confidence_score" in metadata, "metadata.l2.confidence_score가 누락되었습니다."
+        assert metadata.get("confidence_reason"), "metadata.l2.confidence_reason이 비어있습니다."
 
     supply_chain = next((s for s in result["fix_suggestions"] if s["cwe_id"] == "CWE-829"), None)
     assert supply_chain is not None, "CWE-829 공급망 finding이 누락되었습니다."
-    assert supply_chain["registry_status"] == "FOUND"
-    assert supply_chain["osv_status"] == "FOUND"
-    assert supply_chain.get("verification_summary"), "verification_summary가 비어있습니다."
-    assert supply_chain["patch_status"] == "GENERATED"
-    assert supply_chain.get("patch_diff"), "patch_diff가 비어있습니다."
-    assert supply_chain.get("processing_trace"), "processing_trace가 비어있습니다."
-    assert supply_chain["category"] == "supply_chain"
-    assert supply_chain["remediation_kind"] == "version_bump_patch"
-    assert supply_chain["target_ref"] == "dependency:requests"
-    assert supply_chain["decision_status"] == "confirmed"
-    assert supply_chain["confidence_score"] >= 85
-    assert supply_chain.get("confidence_reason"), "confidence_reason이 비어있습니다."
+    supply_chain_metadata = supply_chain["metadata"]["l2"]
+    assert supply_chain_metadata["registry_status"] == "FOUND"
+    assert supply_chain_metadata["osv_status"] == "FOUND"
+    assert supply_chain_metadata.get("verification_summary"), "verification_summary가 비어있습니다."
+    assert supply_chain_metadata["patch_status"] == "GENERATED"
+    assert supply_chain_metadata.get("patch_diff"), "patch_diff가 비어있습니다."
+    assert supply_chain_metadata.get("processing_trace"), "processing_trace가 비어있습니다."
+    assert supply_chain_metadata["category"] == "supply_chain"
+    assert supply_chain_metadata["remediation_kind"] == "version_bump_patch"
+    assert supply_chain_metadata["target_ref"] == "dependency:requests"
+    assert supply_chain_metadata["decision_status"] == "confirmed"
+    assert supply_chain_metadata["confidence_score"] >= 85
+    assert supply_chain_metadata.get("confidence_reason"), "confidence_reason이 비어있습니다."
     assert result["summary"]["findings_total"] >= 1
     assert result["summary"]["l2_vuln_records_total"] >= 1
     assert result["summary"]["supply_chain_findings_total"] >= 1
@@ -173,6 +177,7 @@ def test_e2e_log_history(pipeline):
     
     expected_fields = [
         "issue_id", "file_path", "cwe_id", 
+        "vuln_id", "metadata",
         "severity", "line_number", "code_snippet",
         "original_code", "fixed_code", "status",
         "l2_vuln_record",

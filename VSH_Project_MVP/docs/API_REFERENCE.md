@@ -42,19 +42,40 @@
 
 | 필드명 | 타입 | 설명 |
 |--------|------|------|
-| `issue_id` | `str` | 취약점 ID |
+| `vuln_id` | `str` | 공통 스키마 기준 취약점 ID |
 | `file_path` | `str \| None` | 수정 제안이 적용되어야 하는 실제 파일 경로 |
 | `cwe_id` | `str \| None` | 연관된 CWE ID |
 | `line_number` | `int \| None` | 연관된 라인 번호 |
-| `reachability` | `str \| None` | 실제 위협 도달 가능성 판단 |
-| `kisa_reference` | `str \| None` | 관련 KISA 또는 보안 기준 참조 |
+| `reachability_status` | `str \| None` | 공통 스키마 기준 도달 가능성 상태 |
+| `reachability_confidence` | `str \| None` | 공통 스키마 기준 도달 가능성 신뢰도 |
+| `kisa_ref` | `str \| None` | 공통 스키마 기준 KISA 참조 |
+| `evidence` | `str \| None` | 공통 스키마 기준 취약 코드 스니펫 |
+| `fix_suggestion` | `str \| None` | 공통 스키마 기준 수정 요약 |
+| `metadata` | `FixSuggestionMetadata` | L2 내부 운영 메타데이터 블록 (`metadata.l2`) |
+| `original_code` | `str` | 수정 전 원본 코드 |
+| `fixed_code` | `str` | 수정 후 제안 코드 |
+| `description` | `str` | 수정 내용에 대한 설명 |
+
+#### FixSuggestionMetadata.l2
+`metadata.l2`는 공통 스키마 밖의 L2 전용 운영 필드를 담는다.
+
+| 필드명 | 타입 | 설명 |
+|--------|------|------|
+| `reachability_note` | `str \| None` | L2가 생성한 reachability 설명 문장 |
 | `evidence_refs` | `list[str]` | retrieval이 모은 근거 참조 목록 |
 | `evidence_summary` | `str \| None` | retrieval이 정리한 근거 요약 |
+| `retrieval_backend` | `str \| None` | retrieval 실행 경로 (`static_only`, `hybrid` 등) |
+| `chroma_status` | `str \| None` | Chroma RAG 상태 |
+| `chroma_summary` | `str \| None` | Chroma 상태 설명 |
+| `chroma_hits` | `int` | Chroma 적중 수 |
 | `registry_status` | `str \| None` | registry verifier 결과 상태 |
 | `registry_summary` | `str \| None` | registry verifier 상세 설명 |
 | `osv_status` | `str \| None` | OSV verifier 결과 상태 |
 | `osv_summary` | `str \| None` | OSV verifier 상세 설명 |
 | `verification_summary` | `str \| None` | verifier 결과를 합친 요약 |
+| `decision_status` | `str \| None` | 최종 판단 상태 |
+| `confidence_score` | `int` | 신뢰도 점수 |
+| `confidence_reason` | `str \| None` | 신뢰도 산정 사유 |
 | `patch_status` | `str \| None` | patch preview 생성 상태 |
 | `patch_summary` | `str \| None` | patch preview 생성 요약 |
 | `patch_diff` | `str \| None` | unified diff 형식 patch preview |
@@ -63,9 +84,6 @@
 | `category` | `str \| None` | finding 분류 (`code`, `supply_chain`) |
 | `remediation_kind` | `str \| None` | 수정 방식 분류 |
 | `target_ref` | `str \| None` | L3 handoff용 대상 식별자 |
-| `original_code` | `str` | 수정 전 원본 코드 |
-| `fixed_code` | `str` | 수정 후 제안 코드 |
-| `description` | `str` | 수정 내용에 대한 설명 |
 
 ---
 

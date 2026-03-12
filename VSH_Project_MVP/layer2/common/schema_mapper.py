@@ -34,7 +34,7 @@ def build_l2_vuln_records(
 
         records.append(
             VulnRecord(
-                vuln_id=l1_record.vuln_id if l1_record else _build_vuln_id(suggestion.issue_id),
+                vuln_id=l1_record.vuln_id if l1_record else _build_vuln_id(suggestion.vuln_id),
                 rule_id=_resolve_rule_id(finding, l1_record),
                 source="L2",
                 detected_at=l1_record.detected_at if l1_record else _now_iso(),
@@ -50,8 +50,8 @@ def build_l2_vuln_records(
                 severity=(l1_record.severity if l1_record else _severity_from_finding(finding)),
                 cvss_score=l1_record.cvss_score if l1_record else _extract_cvss(suggestion.evidence_refs),
                 reachability_status=_normalize_reachability(finding),
-                reachability_confidence=_confidence_band(suggestion.confidence_score),
-                kisa_ref=suggestion.kisa_reference or (l1_record.kisa_ref if l1_record else "미매핑-추후보강"),
+                reachability_confidence=_confidence_band(suggestion.metadata.l2.confidence_score),
+                kisa_ref=suggestion.kisa_ref or (l1_record.kisa_ref if l1_record else "미매핑-추후보강"),
                 fss_ref=l1_record.fss_ref if l1_record else None,
                 owasp_ref=l1_record.owasp_ref if l1_record else None,
                 evidence=suggestion.original_code or (finding.code_snippet if finding else ""),
@@ -72,9 +72,9 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _build_vuln_id(issue_id: str | None) -> str:
-    if issue_id:
-        return issue_id
+def _build_vuln_id(vuln_id: str | None) -> str:
+    if vuln_id:
+        return vuln_id
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     return f"VSH-{date_str}-L2"
 
@@ -127,9 +127,9 @@ def _severity_from_finding(finding: Vulnerability | None) -> str:
 def _normalize_reachability(finding: Vulnerability | None) -> str:
     if finding is None:
         return "unknown"
-    if finding.reachability_status == "YES":
+    if finding.reachability_status in {"YES", "reachable"}:
         return "reachable"
-    if finding.reachability_status == "NO":
+    if finding.reachability_status in {"NO", "unreachable"}:
         return "unreachable"
     return "unknown"
 

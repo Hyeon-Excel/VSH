@@ -46,7 +46,7 @@ def annotate_reachability(file_path: str, findings: list[Vulnerability]) -> list
         if finding.cwe_id == "CWE-829":
             continue
         if not source_hits or not sink_hits:
-            finding.reachability_status = "NO"
+            finding.reachability_status = "unreachable"
             continue
 
         line_number = max(1, min(finding.line_number, len(lines)))
@@ -61,11 +61,11 @@ def annotate_reachability(file_path: str, findings: list[Vulnerability]) -> list
             and sink_distance <= 12
             and source_sink_distance <= 20
         ):
-            finding.reachability_status = "YES"
+            finding.reachability_status = "reachable"
         elif source_sink_distance <= 80:
-            finding.reachability_status = "UNKNOWN"
+            finding.reachability_status = "unknown"
         else:
-            finding.reachability_status = "NO"
+            finding.reachability_status = "unreachable"
 
         finding.metadata.setdefault("reachability_mode", "lightweight_heuristic")
         finding.metadata["source_hits"] = len(source_hits)

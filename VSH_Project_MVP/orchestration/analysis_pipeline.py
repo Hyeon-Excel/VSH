@@ -14,6 +14,7 @@ from repository.base_repository import BaseReadRepository, BaseWriteRepository
 from models.vulnerability import Vulnerability
 from models.scan_result import ScanResult
 from models.fix_suggestion import FixSuggestion
+from models.common_schema import PackageRecord, VulnRecord
 
 class AnalysisPipeline(BasePipeline):
     """
@@ -311,29 +312,24 @@ class AnalysisPipeline(BasePipeline):
         decision_status, confidence_score, confidence_reason = build_decision_metadata(
             finding.cwe_id,
             analysis_context,
-            decision_status=suggestion.decision_status,
-            confidence_score=suggestion.confidence_score,
-            confidence_reason=suggestion.confidence_reason,
+            decision_status=suggestion.metadata.l2.decision_status,
+            confidence_score=suggestion.metadata.l2.confidence_score,
+            confidence_reason=suggestion.metadata.l2.confidence_reason,
         )
         canonical_issue_id = self._build_issue_id(
             finding_file_path,
             finding.cwe_id,
             finding.line_number,
         )
-
-        return suggestion.model_copy(
-            update={
-                "issue_id": canonical_issue_id,
-                "file_path": finding_file_path,
-                "cwe_id": finding.cwe_id,
-                "line_number": finding.line_number,
+        existing_l2 = suggestion.metadata.l2.model_dump()
+        existing_l2.update(
+            {
                 "evidence_refs": suggestion.evidence_refs or evidence_context.get("evidence_refs", []),
                 "evidence_summary": suggestion.evidence_summary or evidence_context.get("evidence_summary"),
                 "retrieval_backend": suggestion.retrieval_backend or evidence_context.get("retrieval_backend"),
                 "chroma_status": suggestion.chroma_status or evidence_context.get("chroma_status"),
                 "chroma_summary": suggestion.chroma_summary or evidence_context.get("chroma_summary"),
                 "chroma_hits": max(suggestion.chroma_hits, evidence_context.get("chroma_hits", 0)),
-                "kisa_reference": suggestion.kisa_reference or evidence_context.get("primary_reference"),
                 "registry_status": suggestion.registry_status or verification_context.get("registry_status"),
                 "registry_summary": suggestion.registry_summary or verification_context.get("registry_summary"),
                 "osv_status": suggestion.osv_status or verification_context.get("osv_status"),
@@ -356,16 +352,34 @@ class AnalysisPipeline(BasePipeline):
             }
         )
 
+        normalized_payload = suggestion.model_dump()
+        normalized_payload.update(
+            {
+                "vuln_id": canonical_issue_id,
+                "file_path": finding_file_path,
+                "cwe_id": finding.cwe_id,
+                "line_number": finding.line_number,
+                "kisa_ref": suggestion.kisa_ref or evidence_context.get("primary_reference"),
+                "metadata": {
+                    "l2": existing_l2,
+                },
+            }
+        )
+        return FixSuggestion(**normalized_payload)
+
     @staticmethod
     def _build_log_data(
         finding: Vulnerability,
         suggestion: FixSuggestion,
         l2_vuln_record: dict | None = None,
     ) -> dict:
+        l2 = suggestion.metadata.l2
         return {
             "issue_id": suggestion.issue_id,
+            "vuln_id": suggestion.vuln_id,
             "file_path": suggestion.file_path,
             "l2_vuln_record": l2_vuln_record,
+            "metadata": suggestion.metadata.model_dump(),
             "rule_id": finding.rule_id,
             "cwe_id": finding.cwe_id,
             "severity": finding.severity,
@@ -377,29 +391,29 @@ class AnalysisPipeline(BasePipeline):
             "fixed_code": suggestion.fixed_code,
             "description": suggestion.description,
             "reachability": suggestion.reachability,
-            "kisa_reference": suggestion.kisa_reference,
-            "evidence_refs": suggestion.evidence_refs,
-            "evidence_summary": suggestion.evidence_summary,
-            "retrieval_backend": suggestion.retrieval_backend,
-            "chroma_status": suggestion.chroma_status,
-            "chroma_summary": suggestion.chroma_summary,
-            "chroma_hits": suggestion.chroma_hits,
-            "registry_status": suggestion.registry_status,
-            "registry_summary": suggestion.registry_summary,
-            "osv_status": suggestion.osv_status,
-            "osv_summary": suggestion.osv_summary,
-            "verification_summary": suggestion.verification_summary,
-            "decision_status": suggestion.decision_status,
-            "confidence_score": suggestion.confidence_score,
-            "confidence_reason": suggestion.confidence_reason,
-            "patch_status": suggestion.patch_status,
-            "patch_summary": suggestion.patch_summary,
-            "patch_diff": suggestion.patch_diff,
-            "processing_trace": suggestion.processing_trace,
-            "processing_summary": suggestion.processing_summary,
-            "category": suggestion.category,
-            "remediation_kind": suggestion.remediation_kind,
-            "target_ref": suggestion.target_ref,
+            "kisa_reference": suggestion.kisa_ref,
+            "evidence_refs": l2.evidence_refs,
+            "evidence_summary": l2.evidence_summary,
+            "retrieval_backend": l2.retrieval_backend,
+            "chroma_status": l2.chroma_status,
+            "chroma_summary": l2.chroma_summary,
+            "chroma_hits": l2.chroma_hits,
+            "registry_status": l2.registry_status,
+            "registry_summary": l2.registry_summary,
+            "osv_status": l2.osv_status,
+            "osv_summary": l2.osv_summary,
+            "verification_summary": l2.verification_summary,
+            "decision_status": l2.decision_status,
+            "confidence_score": l2.confidence_score,
+            "confidence_reason": l2.confidence_reason,
+            "patch_status": l2.patch_status,
+            "patch_summary": l2.patch_summary,
+            "patch_diff": l2.patch_diff,
+            "processing_trace": l2.processing_trace,
+            "processing_summary": l2.processing_summary,
+            "category": l2.category,
+            "remediation_kind": l2.remediation_kind,
+            "target_ref": l2.target_ref,
             "status": "pending",
         }
 
@@ -457,8 +471,8 @@ class AnalysisPipeline(BasePipeline):
         return merged
 
     @staticmethod
-    def _merge_vuln_records(scan_results: List[ScanResult]) -> List[Dict]:
-        merged: List = []
+    def _merge_vuln_records(scan_results: List[ScanResult]) -> List[VulnRecord]:
+        merged: List[VulnRecord] = []
         seen: set[tuple[str | None, int | None, str | None]] = set()
         for result in scan_results:
             for record in result.vuln_records:
@@ -474,8 +488,8 @@ class AnalysisPipeline(BasePipeline):
         return merged
 
     @staticmethod
-    def _merge_package_records(scan_results: List[ScanResult]) -> List[Dict]:
-        merged: List = []
+    def _merge_package_records(scan_results: List[ScanResult]) -> List[PackageRecord]:
+        merged: List[PackageRecord] = []
         seen: set[str] = set()
         for result in scan_results:
             for record in result.package_records:
@@ -587,27 +601,31 @@ class AnalysisPipeline(BasePipeline):
             original_code=finding.code_snippet,
             fixed_code="",
             description="L2 분석 실패로 수정 제안을 생성하지 못했습니다.",
-            evidence_refs=evidence_context.get("evidence_refs", []),
-            evidence_summary=evidence_context.get("evidence_summary"),
-            retrieval_backend=evidence_context.get("retrieval_backend"),
-            chroma_status=evidence_context.get("chroma_status"),
-            chroma_summary=evidence_context.get("chroma_summary"),
-            chroma_hits=evidence_context.get("chroma_hits", 0),
-            kisa_reference=evidence_context.get("primary_reference"),
-            registry_status=verification_context.get("registry_status"),
-            registry_summary=verification_context.get("registry_summary"),
-            osv_status=verification_context.get("osv_status"),
-            osv_summary=verification_context.get("osv_summary"),
-            verification_summary=verification_context.get("verification_summary"),
-            decision_status="analysis_failed",
-            confidence_score=0,
-            confidence_reason="L2 분석 실패로 신뢰도를 계산하지 못했습니다.",
-            category=cls._classify_category(finding.cwe_id),
-            target_ref=cls._build_target_ref(
-                finding_file_path,
-                finding,
-                cls._classify_category(finding.cwe_id),
-            ),
+            kisa_ref=evidence_context.get("primary_reference"),
+            metadata={
+                "l2": {
+                    "evidence_refs": evidence_context.get("evidence_refs", []),
+                    "evidence_summary": evidence_context.get("evidence_summary"),
+                    "retrieval_backend": evidence_context.get("retrieval_backend"),
+                    "chroma_status": evidence_context.get("chroma_status"),
+                    "chroma_summary": evidence_context.get("chroma_summary"),
+                    "chroma_hits": evidence_context.get("chroma_hits", 0),
+                    "registry_status": verification_context.get("registry_status"),
+                    "registry_summary": verification_context.get("registry_summary"),
+                    "osv_status": verification_context.get("osv_status"),
+                    "osv_summary": verification_context.get("osv_summary"),
+                    "verification_summary": verification_context.get("verification_summary"),
+                    "decision_status": "analysis_failed",
+                    "confidence_score": 0,
+                    "confidence_reason": "L2 분석 실패로 신뢰도를 계산하지 못했습니다.",
+                    "category": cls._classify_category(finding.cwe_id),
+                    "target_ref": cls._build_target_ref(
+                        finding_file_path,
+                        finding,
+                        cls._classify_category(finding.cwe_id),
+                    ),
+                }
+            },
         )
         l2_vuln_record = next(
             iter(build_l2_vuln_records(scan_result, [placeholder_suggestion])),
@@ -615,8 +633,10 @@ class AnalysisPipeline(BasePipeline):
         )
         return {
             "issue_id": cls._build_issue_id(finding_file_path, finding.cwe_id, finding.line_number),
+            "vuln_id": placeholder_suggestion.vuln_id,
             "file_path": finding_file_path,
             "l2_vuln_record": l2_vuln_record.model_dump() if l2_vuln_record else None,
+            "metadata": placeholder_suggestion.metadata.model_dump(),
             "rule_id": finding.rule_id,
             "cwe_id": finding.cwe_id,
             "severity": finding.severity,
@@ -629,30 +649,26 @@ class AnalysisPipeline(BasePipeline):
             "description": "L2 분석 실패로 수정 제안을 생성하지 못했습니다.",
             "reachability": None,
             "kisa_reference": evidence_context.get("primary_reference"),
-            "evidence_refs": evidence_context.get("evidence_refs", []),
-            "evidence_summary": evidence_context.get("evidence_summary"),
-            "retrieval_backend": evidence_context.get("retrieval_backend"),
-            "chroma_status": evidence_context.get("chroma_status"),
-            "chroma_summary": evidence_context.get("chroma_summary"),
-            "chroma_hits": evidence_context.get("chroma_hits", 0),
-            "registry_status": verification_context.get("registry_status"),
-            "registry_summary": verification_context.get("registry_summary"),
-            "osv_status": verification_context.get("osv_status"),
-            "osv_summary": verification_context.get("osv_summary"),
-            "verification_summary": verification_context.get("verification_summary"),
-            "decision_status": "analysis_failed",
-            "confidence_score": 0,
-            "confidence_reason": "L2 분석 실패로 신뢰도를 계산하지 못했습니다.",
-            "patch_status": None,
-            "patch_summary": None,
-            "patch_diff": None,
-            "category": cls._classify_category(finding.cwe_id),
-            "remediation_kind": None,
-            "target_ref": cls._build_target_ref(
-                finding_file_path,
-                finding,
-                cls._classify_category(finding.cwe_id),
-            ),
+            "evidence_refs": placeholder_suggestion.evidence_refs,
+            "evidence_summary": placeholder_suggestion.evidence_summary,
+            "retrieval_backend": placeholder_suggestion.retrieval_backend,
+            "chroma_status": placeholder_suggestion.chroma_status,
+            "chroma_summary": placeholder_suggestion.chroma_summary,
+            "chroma_hits": placeholder_suggestion.chroma_hits,
+            "registry_status": placeholder_suggestion.registry_status,
+            "registry_summary": placeholder_suggestion.registry_summary,
+            "osv_status": placeholder_suggestion.osv_status,
+            "osv_summary": placeholder_suggestion.osv_summary,
+            "verification_summary": placeholder_suggestion.verification_summary,
+            "decision_status": placeholder_suggestion.decision_status,
+            "confidence_score": placeholder_suggestion.confidence_score,
+            "confidence_reason": placeholder_suggestion.confidence_reason,
+            "patch_status": placeholder_suggestion.patch_status,
+            "patch_summary": placeholder_suggestion.patch_summary,
+            "patch_diff": placeholder_suggestion.patch_diff,
+            "category": placeholder_suggestion.category,
+            "remediation_kind": placeholder_suggestion.remediation_kind,
+            "target_ref": placeholder_suggestion.target_ref,
             "processing_trace": cls._build_processing_trace(
                 evidence_context=evidence_context,
                 verification_context=verification_context,
@@ -835,7 +851,7 @@ class AnalysisPipeline(BasePipeline):
             "l1_notes_total": len(integrated_scan_result.notes),
             "rule_tagged_total": sum(1 for finding in findings if finding.rule_id),
             "reachable_findings_total": sum(
-                1 for finding in findings if finding.reachability_status == "YES"
+                1 for finding in findings if finding.reachability_status == "reachable"
             ),
             "typosquatting_findings_total": sum(
                 1 for finding in findings if finding.cwe_id == "CWE-1104"
@@ -843,33 +859,34 @@ class AnalysisPipeline(BasePipeline):
             "code_findings_total": sum(1 for finding in findings if finding.cwe_id != "CWE-829"),
             "supply_chain_findings_total": sum(1 for finding in findings if finding.cwe_id == "CWE-829"),
             "code_fix_suggestions_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.category == "code"
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.category == "code"
             ),
             "supply_chain_fix_suggestions_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.category == "supply_chain"
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.category == "supply_chain"
             ),
             "verified_total": sum(
                 1
                 for suggestion in fix_suggestions
-                if suggestion.registry_status is not None or suggestion.osv_status is not None
+                if suggestion.metadata.l2.registry_status is not None
+                or suggestion.metadata.l2.osv_status is not None
             ),
             "patch_generated_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.patch_status == "GENERATED"
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.patch_status == "GENERATED"
             ),
             "chroma_enriched_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.chroma_hits > 0
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.chroma_hits > 0
             ),
             "retrieval_hybrid_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.retrieval_backend == "hybrid"
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.retrieval_backend == "hybrid"
             ),
             "retrieval_static_only_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.retrieval_backend == "static_only"
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.retrieval_backend == "static_only"
             ),
             "decision_confirmed_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.decision_status == "confirmed"
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.decision_status == "confirmed"
             ),
             "confidence_high_total": sum(
-                1 for suggestion in fix_suggestions if suggestion.confidence_score >= 85
+                1 for suggestion in fix_suggestions if suggestion.metadata.l2.confidence_score >= 85
             ),
         }
         if retriever_status:

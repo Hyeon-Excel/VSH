@@ -113,8 +113,8 @@ def test_fix_suggestion_preserves_l2_metadata():
         file_path="requirements.txt",
         cwe_id="CWE-89",
         line_number=7,
-        reachability="User-controlled input reaches the query.",
-        kisa_reference="KISA DB-01",
+        metadata={"l2": {"reachability_note": "User-controlled input reaches the query."}},
+        kisa_ref="KISA DB-01",
         original_code="cursor.execute(query % user_input)",
         fixed_code="cursor.execute(query, (user_input,))",
         description="Use parameter binding instead of string interpolation.",
@@ -123,32 +123,37 @@ def test_fix_suggestion_preserves_l2_metadata():
     payload = suggestion.model_dump()
 
     assert payload["file_path"] == "requirements.txt"
+    assert payload["vuln_id"] == "issue-1"
     assert payload["cwe_id"] == "CWE-89"
     assert payload["line_number"] == 7
-    assert payload["reachability"] == "User-controlled input reaches the query."
-    assert payload["kisa_reference"] == "KISA DB-01"
-    assert payload["evidence_refs"] == []
-    assert payload["evidence_summary"] is None
-    assert payload["retrieval_backend"] is None
-    assert payload["chroma_status"] is None
-    assert payload["chroma_summary"] is None
-    assert payload["chroma_hits"] == 0
-    assert payload["registry_status"] is None
-    assert payload["registry_summary"] is None
-    assert payload["osv_status"] is None
-    assert payload["osv_summary"] is None
-    assert payload["verification_summary"] is None
-    assert payload["decision_status"] is None
-    assert payload["confidence_score"] == 0
-    assert payload["confidence_reason"] is None
-    assert payload["patch_status"] is None
-    assert payload["patch_summary"] is None
-    assert payload["patch_diff"] is None
-    assert payload["processing_trace"] == []
-    assert payload["processing_summary"] is None
-    assert payload["category"] is None
-    assert payload["remediation_kind"] is None
-    assert payload["target_ref"] is None
+    assert payload["kisa_ref"] == "KISA DB-01"
+    assert payload["evidence"] == "cursor.execute(query % user_input)"
+    assert payload["fix_suggestion"] == "Use parameter binding instead of string interpolation."
+    assert payload["metadata"]["l2"]["reachability_note"] == "User-controlled input reaches the query."
+    assert payload["metadata"]["l2"]["evidence_refs"] == []
+    assert payload["metadata"]["l2"]["evidence_summary"] is None
+    assert payload["metadata"]["l2"]["retrieval_backend"] is None
+    assert payload["metadata"]["l2"]["chroma_status"] is None
+    assert payload["metadata"]["l2"]["chroma_summary"] is None
+    assert payload["metadata"]["l2"]["chroma_hits"] == 0
+    assert payload["metadata"]["l2"]["registry_status"] is None
+    assert payload["metadata"]["l2"]["registry_summary"] is None
+    assert payload["metadata"]["l2"]["osv_status"] is None
+    assert payload["metadata"]["l2"]["osv_summary"] is None
+    assert payload["metadata"]["l2"]["verification_summary"] is None
+    assert payload["metadata"]["l2"]["decision_status"] is None
+    assert payload["metadata"]["l2"]["confidence_score"] == 0
+    assert payload["metadata"]["l2"]["confidence_reason"] is None
+    assert payload["metadata"]["l2"]["patch_status"] is None
+    assert payload["metadata"]["l2"]["patch_summary"] is None
+    assert payload["metadata"]["l2"]["patch_diff"] is None
+    assert payload["metadata"]["l2"]["processing_trace"] == []
+    assert payload["metadata"]["l2"]["processing_summary"] is None
+    assert payload["metadata"]["l2"]["category"] is None
+    assert payload["metadata"]["l2"]["remediation_kind"] is None
+    assert payload["metadata"]["l2"]["target_ref"] is None
+    assert payload["metadata"]["l2"]["confidence_score"] == 0
+    assert payload["metadata"]["l2"]["processing_trace"] == []
 
 
 def test_pipeline_package_exports_factory_without_optional_import_masking():
@@ -192,29 +197,30 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
     )
 
     result = pipeline.run(str(vulnerable_file))
+    metadata = result["fix_suggestions"][0]["metadata"]["l2"]
 
     assert result["fix_suggestions"][0]["cwe_id"] == "CWE-89"
     assert result["fix_suggestions"][0]["line_number"] == 7
     assert result["fix_suggestions"][0]["file_path"] == str(vulnerable_file)
-    assert result["fix_suggestions"][0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
-    assert result["fix_suggestions"][0]["reachability"] == "User input is directly reachable from the sink."
-    assert result["fix_suggestions"][0]["kisa_reference"] == "KISA DB-01"
-    assert result["fix_suggestions"][0]["evidence_refs"] == ["CWE-89", "KISA 시큐어코딩 DB-01"]
-    assert result["fix_suggestions"][0]["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
-    assert result["fix_suggestions"][0]["retrieval_backend"] == "static_only"
-    assert result["fix_suggestions"][0]["chroma_status"] == "MISSING_DEPENDENCY"
-    assert result["fix_suggestions"][0]["chroma_hits"] == 0
-    assert result["fix_suggestions"][0]["decision_status"] == "confirmed"
-    assert result["fix_suggestions"][0]["confidence_score"] > 0
-    assert result["fix_suggestions"][0]["confidence_reason"]
-    assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
-    assert result["fix_suggestions"][0]["patch_summary"]
-    assert "-cursor.execute(query % user_input)" in (result["fix_suggestions"][0]["patch_diff"] or "")
-    assert "+cursor.execute(query, (user_input,))" in (result["fix_suggestions"][0]["patch_diff"] or "")
-    assert result["fix_suggestions"][0]["category"] == "code"
-    assert result["fix_suggestions"][0]["remediation_kind"] == "code_patch"
-    assert result["fix_suggestions"][0]["target_ref"] == f"{vulnerable_file}:7"
-    assert result["fix_suggestions"][0]["processing_trace"] == [
+    assert result["fix_suggestions"][0]["vuln_id"] == f"{vulnerable_file}_CWE-89_7"
+    assert result["fix_suggestions"][0]["kisa_ref"] == "KISA DB-01"
+    assert metadata["reachability_note"] == "User input is directly reachable from the sink."
+    assert metadata["evidence_refs"] == ["CWE-89", "KISA 시큐어코딩 DB-01"]
+    assert metadata["evidence_summary"] == "sample.py에서 SQL Injection 패턴이 확인되었습니다."
+    assert metadata["retrieval_backend"] == "static_only"
+    assert metadata["chroma_status"] == "MISSING_DEPENDENCY"
+    assert metadata["chroma_hits"] == 0
+    assert metadata["decision_status"] == "confirmed"
+    assert metadata["confidence_score"] > 0
+    assert metadata["confidence_reason"]
+    assert metadata["patch_status"] == "GENERATED"
+    assert metadata["patch_summary"]
+    assert "-cursor.execute(query % user_input)" in (metadata["patch_diff"] or "")
+    assert "+cursor.execute(query, (user_input,))" in (metadata["patch_diff"] or "")
+    assert metadata["category"] == "code"
+    assert metadata["remediation_kind"] == "code_patch"
+    assert metadata["target_ref"] == f"{vulnerable_file}:7"
+    assert metadata["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
         "retrieval:backend:static_only",
@@ -222,9 +228,11 @@ def test_pipeline_uses_structured_l2_metadata_for_logging(tmp_path):
         "analysis:confirmed",
         "patch:GENERATED",
     ]
-    assert result["fix_suggestions"][0]["processing_summary"]
+    assert metadata["processing_summary"]
     assert len(log_repo.saved) == 1
     assert log_repo.saved[0]["issue_id"] == f"{vulnerable_file}_CWE-89_7"
+    assert log_repo.saved[0]["vuln_id"] == f"{vulnerable_file}_CWE-89_7"
+    assert log_repo.saved[0]["metadata"]["l2"]["decision_status"] == "confirmed"
     assert log_repo.saved[0]["file_path"] == str(vulnerable_file)
     assert log_repo.saved[0]["l2_vuln_record"]["source"] == "L2"
     assert log_repo.saved[0]["l2_vuln_record"]["cwe_id"] == "CWE-89"
@@ -346,22 +354,23 @@ def test_pipeline_logs_cross_file_findings_with_structured_file_path(tmp_path):
     )
 
     result = pipeline.run(str(scanned_file))
+    metadata = result["fix_suggestions"][0]["metadata"]["l2"]
 
     assert result["fix_suggestions"][0]["file_path"] == str(requirements_file)
-    assert result["fix_suggestions"][0]["registry_status"] == "FOUND"
-    assert result["fix_suggestions"][0]["osv_status"] == "FOUND"
-    assert "requests==2.9.0" in (result["fix_suggestions"][0]["registry_summary"] or "")
-    assert "CVE-2018-18074" in (result["fix_suggestions"][0]["osv_summary"] or "")
-    assert result["fix_suggestions"][0]["patch_status"] == "GENERATED"
-    assert "-requests==2.9.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
-    assert "+requests>=2.20.0" in (result["fix_suggestions"][0]["patch_diff"] or "")
-    assert result["fix_suggestions"][0]["decision_status"] == "confirmed"
-    assert result["fix_suggestions"][0]["confidence_score"] >= 85
-    assert result["fix_suggestions"][0]["confidence_reason"]
-    assert result["fix_suggestions"][0]["category"] == "supply_chain"
-    assert result["fix_suggestions"][0]["remediation_kind"] == "version_bump_patch"
-    assert result["fix_suggestions"][0]["target_ref"] == "dependency:requests"
-    assert result["fix_suggestions"][0]["processing_trace"] == [
+    assert metadata["registry_status"] == "FOUND"
+    assert metadata["osv_status"] == "FOUND"
+    assert "requests==2.9.0" in (metadata["registry_summary"] or "")
+    assert "CVE-2018-18074" in (metadata["osv_summary"] or "")
+    assert metadata["patch_status"] == "GENERATED"
+    assert "-requests==2.9.0" in (metadata["patch_diff"] or "")
+    assert "+requests>=2.20.0" in (metadata["patch_diff"] or "")
+    assert metadata["decision_status"] == "confirmed"
+    assert metadata["confidence_score"] >= 85
+    assert metadata["confidence_reason"]
+    assert metadata["category"] == "supply_chain"
+    assert metadata["remediation_kind"] == "version_bump_patch"
+    assert metadata["target_ref"] == "dependency:requests"
+    assert metadata["processing_trace"] == [
         "scan:detected",
         "retrieval:enriched",
         "retrieval:backend:static_only",
