@@ -25,7 +25,7 @@ def test_vsh_l1_scanner_detects_pattern_and_typosquatting(tmp_path):
     sql_finding = next(finding for finding in result.findings if finding.cwe_id == "CWE-89")
     typo_finding = next(finding for finding in result.findings if finding.cwe_id == "CWE-1104")
 
-    assert sql_finding.reachability_status == "YES"
+    assert sql_finding.reachability_status == "reachable"
     assert typo_finding.metadata["similar_to"] == "requests"
     assert len(result.vuln_records) >= 2
     assert result.vuln_records[0].source == "L1"
@@ -55,7 +55,7 @@ def test_vsh_l1_scanner_can_build_annotation_preview(tmp_path):
 
     assert str(sample) in annotated.annotated_files
     assert "[VSH-L1]" in annotated.annotated_files[str(sample)]
-    assert "Reachability: YES" in annotated.annotated_files[str(sample)]
+    assert "Reachability: reachable" in annotated.annotated_files[str(sample)]
 
 
 def test_pipeline_factory_can_enable_integrated_l1_scanner(monkeypatch):
