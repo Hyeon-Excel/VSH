@@ -175,6 +175,7 @@ def test_e2e_log_history(pipeline):
         "issue_id", "file_path", "cwe_id", 
         "severity", "line_number", "code_snippet",
         "original_code", "fixed_code", "status",
+        "l2_vuln_record",
         "rule_id", "l1_reachability_status", "l1_references",
         "evidence_refs", "evidence_summary",
         "retrieval_backend", "chroma_status", "chroma_summary", "chroma_hits",
@@ -190,4 +191,7 @@ def test_e2e_log_history(pipeline):
     for log in logs:
         for field in expected_fields:
             assert field in log, f"로그에 '{field}' 필드가 누락되었습니다: {log.get('issue_id')}"
+        assert log["l2_vuln_record"] is not None, "로그에 l2_vuln_record가 비어 있습니다."
+        assert log["l2_vuln_record"]["source"] == "L2"
+        assert log["l2_vuln_record"]["vuln_id"]
         assert log["status"] == "pending", f"초기 상태가 pending이 아닙니다: {log.get('status')}"

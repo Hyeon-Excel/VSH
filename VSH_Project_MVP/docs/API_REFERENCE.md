@@ -11,6 +11,10 @@
 | `file_path` | `str` | 스캔 대상 파일 경로 |
 | `language` | `str` | 파일의 언어 (예: python) |
 | `findings` | `list[Vulnerability]` | 발견된 취약점 리스트 (기본값: 빈 리스트) |
+| `vuln_records` | `list[VulnRecord]` | 공통 스키마 기준 L1 취약점 레코드 |
+| `package_records` | `list[PackageRecord]` | 공통 스키마 기준 패키지 레코드 |
+| `annotated_files` | `dict[str, str]` | 코드 주석 preview 결과 |
+| `notes` | `list[str]` | 스캐너 실행 메모 및 provenance |
 
 **Methods:**
 - `is_clean() -> bool`: 발견된 취약점이 하나도 없으면 `True`를 반환합니다.
@@ -62,6 +66,19 @@
 | `original_code` | `str` | 수정 전 원본 코드 |
 | `fixed_code` | `str` | 수정 후 제안 코드 |
 | `description` | `str` | 수정 내용에 대한 설명 |
+
+---
+
+### Common Schema
+L1/L2/L3가 공통으로 교환하는 구조화 레코드는 `models/common_schema.py`에 정의되어 있습니다.
+
+#### VulnRecord
+공통 취약점 레코드. 현재 파이프라인은 다음 두 경로로 이 구조를 노출합니다.
+- `vuln_records`: L1이 정규화한 원본 결과
+- `l2_vuln_records`: L2가 판단/보강한 후 다시 공통 스키마로 매핑한 결과
+
+#### PackageRecord
+공통 패키지 레코드. 현재는 L1 통합 단계에서 `package_records`로 노출됩니다.
 
 ---
 
@@ -152,6 +169,7 @@ AST(Abstract Syntax Tree) 구문 분석 기반 스캐너입니다.
 실제 분석 흐름을 오케스트레이션하는 클래스입니다. 생성자를 통해 스캐너, 분석기, 레포지토리(Read/Write)를 주입받습니다.
 - **Method**: `run(file_path: str) -> dict`
   - **전체 흐름**: 스캐너 실행 -> 중복 제거 -> Retrieval -> Analyzer 실행 -> Verification 정규화 -> **결과를 `LogRepo`에 영구 저장(original/fixed code 포함)** -> 결과 반환.
+  - **주요 반환 필드**: `scan_results`, `vuln_records`, `package_records`, `l2_vuln_records`, `fix_suggestions`, `summary`
 
 ---
 
@@ -164,6 +182,7 @@ FastAPI를 통해 개발자가 브라우저에서 분석 결과를 리뷰하고 
 
 ### `GET /api/logs`
 - **설명**: `log.json`에 저장된 모든 보안 진단 이력을 조회합니다.
+- **비고**: 각 로그 항목에는 L2 결과를 공통 스키마로 정리한 `l2_vuln_record`가 포함될 수 있습니다.
 
 ### `POST /api/logs/{issue_id}/accept`
 - **설명**: 사용자가 수정을 승인했음을 표시하고 AI 제안 코드를 반환합니다.
