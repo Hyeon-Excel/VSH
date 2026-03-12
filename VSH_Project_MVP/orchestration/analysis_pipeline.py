@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from .base_pipeline import BasePipeline
 from shared.contracts import BaseScanner, BaseAnalyzer
+from shared.finding_dedup import deduplicate_findings
 from layer2.common.schema_mapper import build_l2_vuln_records
 from layer2.patch_builder import PatchBuilder
 from layer2.retriever.evidence_retriever import EvidenceRetriever
@@ -151,7 +152,7 @@ class AnalysisPipeline(BasePipeline):
         # hyeonexcel 수정: run()에 몰려 있던 스캔/중복 제거/통합 ScanResult 생성을 분리해
         # 이후 L3 handoff나 멀티 언어 확장 시 입력 단계만 독립적으로 다룰 수 있게 한다.
         scan_results = self._scan_all_results(file_path)
-        unique_findings = self._deduplicate(
+        unique_findings = deduplicate_findings(
             [
                 finding
                 for result in scan_results
@@ -505,25 +506,6 @@ class AnalysisPipeline(BasePipeline):
         if hasattr(self.evidence_retriever, "runtime_status"):
             return self.evidence_retriever.runtime_status()
         return {}
-
-    @staticmethod
-    def _deduplicate(findings: List[Vulnerability]) -> List[Vulnerability]:
-        """
-        cwe_id와 line_number 조합을 기준으로 중복된 취약점을 제거합니다.
-        
-        Args:
-            findings (List[Vulnerability]): 원본 취약점 리스트
-            
-        Returns:
-            List[Vulnerability]: 중복 제거된 취약점 리스트
-        """
-        unique_map = {}
-        for f in findings:
-            key = f"{f.file_path or ''}_{f.cwe_id}_{f.line_number}"
-            if key not in unique_map:
-                unique_map[key] = f
-        
-        return list(unique_map.values())
 
     @staticmethod
     def _find_matching_vulnerability(
