@@ -1,7 +1,8 @@
 from fastmcp import FastMCP
 from l3.providers.sonarqube.mock import MockSonarQubeProvider
 from l3.providers.sbom.mock import MockSBOMProvider
-from l3.providers.poc.mock import MockPoCProvider
+from l3.providers.poc.real import RealPoCProvider
+from l3.llm.claude_adapter import ClaudeAdapter
 from l3.mock_shared_db import MockSharedDB
 from l3.normalizer import L3Normalizer
 from l3.pipeline import L3Pipeline
@@ -14,7 +15,7 @@ mcp = FastMCP("VSH-L3")
 db = MockSharedDB()
 sonarqube = MockSonarQubeProvider()
 sbom = MockSBOMProvider()
-poc = MockPoCProvider()
+poc = RealPoCProvider(llm=ClaudeAdapter())
 
 # 2단계: DB에 의존하는 객체
 normalizer = L3Normalizer(db)
