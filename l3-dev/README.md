@@ -1,5 +1,16 @@
 # VSH (Vibe Coding Secure Helper) - L3 Cold Path
 
+## 섹션 0. 팀 문서 가이드 (신규 팀원 필독)
+프로젝트의 상세 내용과 개발 규칙은 아래 문서들을 참고해 주세요.
+
+- 📘 **[프로젝트 개요 및 로드맵](./docs/OVERVIEW.md)**: L3의 목적과 4주간의 계획
+- 🏗️ **[시스템 구조 및 모듈 역할](./docs/STRUCTURE.md)**: 아키텍처와 폴더 트리 설명
+- 🔄 **[코드 흐름 및 실행 시퀀스](./docs/FLOW.md)**: 데이터 흐름과 DI 패턴 활용법
+- 📊 **[데이터 명세 및 변수 규칙](./docs/DATA_SPEC.md)**: VulnRecord/PackageRecord 상세 명세
+- 🛠️ **[개발 가이드 및 준수 수칙](./docs/DEVELOP.md)**: 환경 설정 및 12대 골든 규칙
+
+---
+
 ## 섹션 1. 프로젝트 개요
 VSH(Vibe Coding Secure Helper)는 AI 코딩 환경에서 실시간으로 보안 취약점을 탐지하고 조치 가이드를 제공하는 도구입니다. 그 중 L3 Cold Path는 탐지된 취약점에 대한 법적 증거 자료로서의 보안 리포트를 생성하는 역할을 담당합니다. 본 프로젝트는 '분위기 지켜' 팀에서 개발하며, MVP 단계에서는 Python 언어를 주 타겟으로 합니다. 핵심 차별점은 KISA 및 금융보안원(FSS) 컴플라이언스 기준과의 매핑 기능을 제공하며, 실제 공격 가능성을 PoC(Proof of Concept) 기반으로 증명한다는 점에 있습니다.
 
