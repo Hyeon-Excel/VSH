@@ -43,10 +43,10 @@ async def test_scan_project_normal_flow(cleanup_reports, project_path):
     
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
-        assert "VSH 보안 스캔 리포트" in content
-        assert "스캔 요약" in content
-        assert "코드 취약점" in content
-        assert "패키지 취약점" in content
+        assert "VSH 보안 진단 리포트" in content
+        assert "종합 보안 점수" in content
+        assert "취약점 상세" in content
+        assert "SBOM 요약" in content
 
 async def test_scan_project_empty_data(cleanup_reports, project_path):
     with patch.object(sonarqube, 'scan', new=AsyncMock(return_value=[])), \
