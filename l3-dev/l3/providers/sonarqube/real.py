@@ -82,8 +82,19 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
         except Exception as e:
             print(f"[L3 SonarQube] 프로젝트 등록 실패: {str(e)}")
 
+    def _to_docker_path(self, path: str) -> str:
+        import platform
+        if platform.system() == "Windows":
+            path = os.path.abspath(path)
+            drive, rest = os.path.splitdrive(path)
+            drive_letter = drive.replace(":", "").lower()
+            rest = rest.replace("\\", "/").replace("\\", "/")
+            return f"/{drive_letter}{rest}"
+        return os.path.abspath(path)
+
     async def _run_scanner(self, project_path: str) -> bool:
         try:
+            docker_path = self._to_docker_path(project_path)
             cmd = [
                 "docker", "run", "--rm",
                 "-e", f"SONAR_HOST_URL={self.sonar_url}",
@@ -92,7 +103,7 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
                       f"-Dsonar.projectKey={self.sonar_project_key} "
                       f"-Dsonar.organization={self.sonar_org} "
                       f"-Dsonar.sources=.",
-                "-v", f"{project_path}:/usr/src",
+                "-v", f"{docker_path}:/usr/src",
                 "sonarsource/sonar-scanner-cli"
             ]
             result = await asyncio.to_thread(
@@ -104,6 +115,8 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
                 print("[L3 SonarQube] 스캐너 실행 완료")
                 return True
             print(f"[L3 SonarQube] 스캐너 실행 실패: {result.returncode}")
+            print(f"[L3 SonarQube] stdout: {result.stdout[-1000:]}")
+            print(f"[L3 SonarQube] stderr: {result.stderr[-500:]}")
             return False
         except Exception as e:
             print(f"[L3 SonarQube] 스캐너 예외 발생: {str(e)}")
@@ -143,7 +156,7 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
             url = f"{self.sonar_url}/api/issues/search"
             params = {
                 "componentKeys": self.sonar_project_key,
-                "types": "VULNERABILITY",
+                "types": "VULNERABILITY,BUG",
                 "statuses": "OPEN,REOPENED",
                 "resolved": "false"
             }
