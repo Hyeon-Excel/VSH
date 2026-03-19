@@ -106,21 +106,24 @@ Reachability 확인 (실제 위협)     {reachable}건
 
         lines = ["🚨 취약점 상세", "======================================================"]
         for r in vuln_records:
-            reachability = self.REACHABILITY_LABEL.get(r.reachability_status, "❓")
-            impact = self.IMPACT_MAP.get(r.vuln_type, self.IMPACT_MAP["UNKNOWN"])
-            
-            lines.append(f"[{r.severity}] {r.vuln_type} — {r.file_path} {r.line_number}번 라인")
-            lines.append(f"  * CWE          : {r.cwe_id}")
-            lines.append(f"  * CVSS         : {r.cvss_score if r.cvss_score is not None else 'N/A'}")
-            lines.append(f"  * CVE          : {r.cve_id or 'N/A'}")
-            lines.append(f"  * Reachability : {reachability}")
-            lines.append(f"  * 영향 범위    : {impact}")
-            lines.append(f"  * KISA 근거    : {r.kisa_ref}")
-            lines.append(f"  * 금융보안원   : {r.fss_ref or 'N/A'}")
-            lines.append(f"  * OWASP        : {r.owasp_ref or 'N/A'}")
-            lines.append(f"  * 조치         : {r.fix_suggestion}")
-            lines.append(f"  * PoC 검증     : {r.status}")
-            lines.append("")
+            if r.status == "poc_verified":
+                lines.append(self._build_poc_block(r))
+            else:
+                reachability = self.REACHABILITY_LABEL.get(r.reachability_status, "❓")
+                impact = self.IMPACT_MAP.get(r.vuln_type, self.IMPACT_MAP["UNKNOWN"])
+
+                lines.append(f"[{r.severity}] {r.vuln_type} — {r.file_path} {r.line_number}번 라인")
+                lines.append(f"  * CWE          : {r.cwe_id}")
+                lines.append(f"  * CVSS         : {r.cvss_score if r.cvss_score is not None else 'N/A'}")
+                lines.append(f"  * CVE          : {r.cve_id or 'N/A'}")
+                lines.append(f"  * Reachability : {reachability}")
+                lines.append(f"  * 영향 범위    : {impact}")
+                lines.append(f"  * KISA 근거    : {r.kisa_ref}")
+                lines.append(f"  * 금융보안원   : {r.fss_ref or 'N/A'}")
+                lines.append(f"  * OWASP        : {r.owasp_ref or 'N/A'}")
+                lines.append(f"  * 조치         : {r.fix_suggestion}")
+                lines.append(f"  * PoC 검증     : {r.status}")
+                lines.append("")
         
         return "\n".join(lines).strip()
 
@@ -183,6 +186,32 @@ Reachability 확인 (실제 위협)     {reachable}건
                 
             lines.append(f"{r.vuln_type:<20}{r.detected_at:<13}{action:<15}{result}")
             
+        return "\n".join(lines)
+
+    def _build_poc_block(self, r: VulnRecord) -> str:
+        impact = self.IMPACT_MAP.get(r.vuln_type, self.IMPACT_MAP["UNKNOWN"])
+        cvss = r.cvss_score if r.cvss_score is not None else "N/A"
+        owasp = r.owasp_ref or "N/A"
+        evidence = r.code_snippet or "N/A"
+
+        lines = [
+            f"[{r.severity}] {r.cwe_id} — {r.file_path} {r.line_number}번 라인",
+            f"  ✅ PoC 검증 완료",
+            f"",
+            f"  ■ 공격 증거",
+            f"    공격 입력 및 결과 : {evidence}",
+            f"    테스트 환경       : Docker 격리 샌드박스 (--network none)",
+            f"    영향 범위         : {impact}",
+            f"",
+            f"  ■ 법적 근거",
+            f"    KISA  : {r.kisa_ref}",
+            f"    OWASP : {owasp}",
+            f"    CVSS  : {cvss}",
+            f"",
+            f"  ■ 조치 방법",
+            f"    {r.fix_suggestion}",
+            f"",
+        ]
         return "\n".join(lines)
 
     def _format_footer(self) -> str:
