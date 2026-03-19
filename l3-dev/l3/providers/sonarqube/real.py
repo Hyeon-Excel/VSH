@@ -26,10 +26,11 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
                 
             await self._ensure_project()
             
+            scan_start_time = datetime.now(timezone.utc)
             if not await self._run_scanner(project_path):
                 return []
                 
-            if not await self._wait_for_analysis():
+            if not await self._wait_for_analysis(scan_start_time):
                 return []
                 
             issues = await self._fetch_issues()
@@ -122,12 +123,12 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
             print(f"[L3 SonarQube] 스캐너 예외 발생: {str(e)}")
             return False
 
-    async def _wait_for_analysis(self, timeout: int = 120) -> bool:
+    async def _wait_for_analysis(self, scan_start_time: datetime, timeout: int = 120) -> bool:
         try:
             start = time.monotonic()
             url = f"{self.sonar_url}/api/ce/activity"
             params = {"component": self.sonar_project_key}
-            
+
             while (time.monotonic() - start) < timeout:
                 response = await asyncio.to_thread(
                     lambda: requests.get(url, params=params, auth=self.auth, timeout=10)
@@ -135,16 +136,24 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
                 if response.status_code == 200:
                     data = response.json()
                     tasks = data.get("tasks", [])
-                    if tasks:
-                        status = tasks[0].get("status")
+                    for task in tasks:
+                        submitted_str = task.get("submittedAt", "")
+                        if not submitted_str:
+                            continue
+                        submitted = datetime.fromisoformat(
+                            submitted_str.replace("+0000", "+00:00")
+                        )
+                        if submitted <= scan_start_time:
+                            continue
+                        status = task.get("status")
                         if status == "SUCCESS":
                             return True
-                        elif status == "FAILED":
+                        elif status in ("FAILED", "CANCELLED"):
                             return False
-                
+
                 print("[L3 SonarQube] 분석 대기 중...")
                 await asyncio.sleep(10)
-                
+
             print("[L3 SonarQube] 분석 대기 timeout")
             return False
         except Exception as e:
@@ -156,9 +165,7 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
             url = f"{self.sonar_url}/api/issues/search"
             params = {
                 "componentKeys": self.sonar_project_key,
-                "types": "VULNERABILITY,BUG",
-                "statuses": "OPEN,REOPENED",
-                "resolved": "false"
+                "organization": self.sonar_org,
             }
             response = await asyncio.to_thread(
                 lambda: requests.get(url, params=params, auth=self.auth, timeout=10)

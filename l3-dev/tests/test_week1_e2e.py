@@ -1,8 +1,11 @@
 import pytest
 from pathlib import Path
 from unittest.mock import patch, AsyncMock
+from dotenv import load_dotenv
+load_dotenv()      
 from mcp_server import scan_project, db, sonarqube, sbom, poc
 from l3.schema import VulnRecord, PackageRecord
+
 
 # --- fixture ---
 

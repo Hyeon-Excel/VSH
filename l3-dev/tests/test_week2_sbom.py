@@ -2,7 +2,7 @@ import json
 import asyncio
 import pytest
 from unittest.mock import patch, MagicMock
-from l3.providers.sbom.real import SbomProvider
+from l3.providers.sbom.real import RealSBOMProvider
 from l3.models.package_record import PackageRecord
 
 SYFT_OUTPUT = {
@@ -62,7 +62,7 @@ def make_subprocess_mock(output: dict) -> MagicMock:
     return MagicMock(stdout=json.dumps(output))
 
 def test_scan_returns_package_records():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     with patch("l3.providers.sbom.real.subprocess.run") as mock_run, \
          patch("l3.providers.sbom.real.urllib.request.urlopen") as mock_urlopen:
         mock_run.return_value = make_subprocess_mock(SYFT_OUTPUT)
@@ -77,14 +77,14 @@ def test_scan_returns_package_records():
         assert all(isinstance(r, PackageRecord) for r in results)
 
 def test_scan_returns_empty_on_syft_failure():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     with patch("l3.providers.sbom.real.subprocess.run") as mock_run:
         mock_run.return_value = make_subprocess_mock({"artifacts": []})
         results = asyncio.run(provider.scan("some/project/file.py"))
         assert results == []
 
 def test_run_syft_filters_python_only():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     with patch("l3.providers.sbom.real.subprocess.run") as mock_run:
         mock_run.return_value = make_subprocess_mock(SYFT_OUTPUT)
         results = provider._run_syft("some/project/file.py")
@@ -93,7 +93,7 @@ def test_run_syft_filters_python_only():
         assert names == ["PyYAML", "numpy"]
 
 def test_run_syft_skips_missing_fields():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     with patch("l3.providers.sbom.real.subprocess.run") as mock_run:
         mock_run.return_value = make_subprocess_mock({
             "artifacts": [
@@ -106,14 +106,14 @@ def test_run_syft_skips_missing_fields():
         assert results[0]["name"] == "valid"
 
 def test_run_syft_returns_empty_on_failure():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     with patch("l3.providers.sbom.real.subprocess.run") as mock_run:
         mock_run.side_effect = Exception("syft not found")
         results = provider._run_syft("some/project/file.py")
         assert results == []
 
 def test_query_osv_batch_includes_vuln_packages():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     packages = [
         {"name": "PyYAML", "version": "5.3.1", "ecosystem": "PyPI"},
         {"name": "numpy",  "version": "1.24.0", "ecosystem": "PyPI"}
@@ -125,7 +125,7 @@ def test_query_osv_batch_includes_vuln_packages():
         assert result["PyYAML"] == ["GHSA-aaa", "PYSEC-bbb"]
 
 def test_query_osv_batch_excludes_clean_packages():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     packages = [
         {"name": "PyYAML", "version": "5.3.1", "ecosystem": "PyPI"},
         {"name": "numpy",  "version": "1.24.0", "ecosystem": "PyPI"}
@@ -136,7 +136,7 @@ def test_query_osv_batch_excludes_clean_packages():
         assert "numpy" not in result
 
 def test_query_osv_batch_returns_empty_on_failure():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     packages = [
         {"name": "PyYAML", "version": "5.3.1", "ecosystem": "PyPI"}
     ]
@@ -146,7 +146,7 @@ def test_query_osv_batch_returns_empty_on_failure():
         assert result == {}
 
 def test_get_vuln_details_uses_db_severity():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     pkg = {"name": "PyYAML", "version": "5.3.1", "ecosystem": "PyPI"}
     vuln_ids = ["GHSA-aaa"]
     with patch("l3.providers.sbom.real.urllib.request.urlopen") as mock_urlopen:
@@ -158,7 +158,7 @@ def test_get_vuln_details_uses_db_severity():
         assert result[0]["cvss_score"] is None
 
 def test_get_vuln_details_defaults_to_low():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     pkg = {"name": "numpy", "version": "1.24.0", "ecosystem": "PyPI"}
     vuln_ids = ["GHSA-bbb"]
     with patch("l3.providers.sbom.real.urllib.request.urlopen") as mock_urlopen:
@@ -168,7 +168,7 @@ def test_get_vuln_details_defaults_to_low():
         assert result[0]["severity"] == "LOW"
 
 def test_get_vuln_details_deduplicates_cve():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     pkg = {"name": "PyYAML", "version": "5.3.1", "ecosystem": "PyPI"}
     vuln_ids = ["GHSA-aaa", "PYSEC-bbb"]
     with patch("l3.providers.sbom.real.urllib.request.urlopen") as mock_urlopen:
@@ -182,7 +182,7 @@ def test_get_vuln_details_deduplicates_cve():
         assert result[0]["severity"] == "CRITICAL"
 
 def test_build_record_with_cve_id():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     pkg = {"name": "PyYAML", "version": "5.3.1", "ecosystem": "PyPI"}
     vuln = {"cve_id": "CVE-2020-14343", "severity": "CRITICAL", "cvss_score": None}
     record = provider._build_record(pkg, vuln)
@@ -192,7 +192,7 @@ def test_build_record_with_cve_id():
     assert record.source == "L3_SBOM"
 
 def test_build_record_without_cve_id():
-    provider = SbomProvider()
+    provider = RealSBOMProvider()
     pkg = {"name": "numpy", "version": "1.24.0", "ecosystem": "PyPI"}
     vuln = {"cve_id": None, "severity": "LOW", "cvss_score": None}
     record = provider._build_record(pkg, vuln)

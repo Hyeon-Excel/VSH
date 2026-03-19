@@ -41,8 +41,13 @@ class RealSBOMProvider(AbstractSBOMProvider):
             data = json.loads(result.stdout)
             
             packages = []
+            seen = set()
             for artifact in data.get("artifacts", []):
                 if artifact.get("type", "").lower() == "python" and artifact.get("name") and artifact.get("version"):
+                    key = (artifact["name"], artifact["version"])
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     packages.append({
                         "name": artifact["name"],
                         "version": artifact["version"],

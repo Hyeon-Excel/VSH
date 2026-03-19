@@ -1,5 +1,6 @@
 import asyncio
 import pytest
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock, AsyncMock
 from requests.auth import HTTPBasicAuth
 from l3.llm.claude_adapter import ClaudeAdapter
@@ -15,6 +16,14 @@ def get_provider():
     provider.sonar_project_key = "test-project"
     provider.auth = HTTPBasicAuth("test-token", "")
     return provider
+
+def get_past_time():
+    return datetime.now(timezone.utc) - timedelta(seconds=60)
+
+def get_future_submitted():
+    return (datetime.now(timezone.utc) + timedelta(seconds=10)).strftime(
+        "%Y-%m-%dT%H:%M:%S+0000"
+    )
 
 # --- _health_check ---
 
@@ -122,11 +131,11 @@ def test_wait_for_analysis_success():
          patch("l3.providers.sonarqube.real.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tasks": [{"status": "SUCCESS"}]}
+        mock_response.json.return_value = {"tasks": [{"status": "SUCCESS", "submittedAt": get_future_submitted()}]}
         mock_response.text = ""
         mock_get.return_value = mock_response
         
-        result = asyncio.run(provider._wait_for_analysis())
+        result = asyncio.run(provider._wait_for_analysis(get_past_time()))
         assert result == True
 
 def test_wait_for_analysis_failed():
@@ -135,11 +144,11 @@ def test_wait_for_analysis_failed():
          patch("l3.providers.sonarqube.real.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tasks": [{"status": "FAILED"}]}
+        mock_response.json.return_value = {"tasks": [{"status": "FAILED", "submittedAt": get_future_submitted()}]}
         mock_response.text = ""
         mock_get.return_value = mock_response
         
-        result = asyncio.run(provider._wait_for_analysis())
+        result = asyncio.run(provider._wait_for_analysis(get_past_time()))
         assert result == False
 
 def test_wait_for_analysis_empty_then_success():
@@ -153,17 +162,17 @@ def test_wait_for_analysis_empty_then_success():
         
         mock_response2 = MagicMock()
         mock_response2.status_code = 200
-        mock_response2.json.return_value = {"tasks": [{"status": "SUCCESS"}]}
+        mock_response2.json.return_value = {"tasks": [{"status": "SUCCESS", "submittedAt": get_future_submitted()}]}
         mock_response2.text = ""
         
         mock_get.side_effect = [mock_response1, mock_response2]
         
-        result = asyncio.run(provider._wait_for_analysis())
+        result = asyncio.run(provider._wait_for_analysis(get_past_time()))
         assert result == True
 
 def test_wait_for_analysis_timeout():
     provider = get_provider()
-    result = asyncio.run(provider._wait_for_analysis(timeout=0))
+    result = asyncio.run(provider._wait_for_analysis(get_past_time(), timeout=0))
     assert result == False
 
 # --- _fetch_issues ---
