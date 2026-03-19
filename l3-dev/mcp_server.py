@@ -1,6 +1,6 @@
 from fastmcp import FastMCP
 from l3.providers.sonarqube.real import RealSonarQubeProvider
-from l3.providers.sbom.mock import MockSBOMProvider
+from l3.providers.sbom.real import RealSBOMProvider
 from l3.providers.poc.real import RealPoCProvider
 from l3.llm.gemini_adapter import GeminiAdapter
 from l3.mock_shared_db import MockSharedDB
@@ -14,7 +14,7 @@ mcp = FastMCP("VSH-L3")
 # 1단계: 의존성 없는 기반 객체
 db = MockSharedDB()
 sonarqube = RealSonarQubeProvider(llm=GeminiAdapter())
-sbom = MockSBOMProvider()
+sbom = RealSBOMProvider()
 poc = RealPoCProvider(llm=GeminiAdapter())
 
 # 2단계: DB에 의존하는 객체

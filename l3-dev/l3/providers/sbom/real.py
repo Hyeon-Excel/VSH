@@ -8,7 +8,7 @@ from typing import List, Dict
 from l3.models.package_record import PackageRecord
 from l3.providers.base import AbstractSBOMProvider
 
-class SbomProvider(AbstractSBOMProvider):
+class RealSBOMProvider(AbstractSBOMProvider):
 
     async def scan(self, project_path: str) -> List[PackageRecord]:
         packages = self._run_syft(project_path)

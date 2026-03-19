@@ -3,7 +3,7 @@ import asyncio
 from dotenv import load_dotenv
 load_dotenv()
 from l3.providers.sonarqube.real import RealSonarQubeProvider
-from l3.providers.sbom.mock import MockSBOMProvider
+from l3.providers.sbom.real import RealSBOMProvider
 from l3.providers.poc.real import RealPoCProvider
 from l3.llm.gemini_adapter import GeminiAdapter
 from l3.mock_shared_db import MockSharedDB
@@ -16,7 +16,7 @@ async def main():
 
     db = MockSharedDB()
     sonarqube = RealSonarQubeProvider(llm=GeminiAdapter())
-    sbom = MockSBOMProvider()
+    sbom = RealSBOMProvider()
     poc = RealPoCProvider(llm=GeminiAdapter())
     normalizer = L3Normalizer(db)
     report_generator = L3ReportGenerator(db)
