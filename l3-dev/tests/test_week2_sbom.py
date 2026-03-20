@@ -64,7 +64,8 @@ def make_subprocess_mock(output: dict) -> MagicMock:
 def test_scan_returns_package_records():
     provider = RealSBOMProvider()
     with patch("l3.providers.sbom.real.subprocess.run") as mock_run, \
-         patch("l3.providers.sbom.real.urllib.request.urlopen") as mock_urlopen:
+         patch("l3.providers.sbom.real.urllib.request.urlopen") as mock_urlopen, \
+         patch.object(provider, "_detect_languages", return_value=["python"]):
         mock_run.return_value = make_subprocess_mock(SYFT_OUTPUT)
         mock_urlopen.side_effect = [
             make_urlopen_mock(OSV_BATCH_RESPONSE),
@@ -78,7 +79,8 @@ def test_scan_returns_package_records():
 
 def test_scan_returns_empty_on_syft_failure():
     provider = RealSBOMProvider()
-    with patch("l3.providers.sbom.real.subprocess.run") as mock_run:
+    with patch("l3.providers.sbom.real.subprocess.run") as mock_run, \
+         patch.object(provider, "_detect_languages", return_value=["python"]):
         mock_run.return_value = make_subprocess_mock({"artifacts": []})
         results = asyncio.run(provider.scan("some/project/file.py"))
         assert results == []

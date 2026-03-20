@@ -11,7 +11,24 @@ from l3.providers.base import AbstractSBOMProvider
 class RealSBOMProvider(AbstractSBOMProvider):
 
     async def scan(self, project_path: str) -> List[PackageRecord]:
-        packages = self._run_syft(project_path)
+        languages = self._detect_languages(project_path)
+        
+        raw_packages = []
+        if "python" in languages:
+            raw_packages.extend(self._run_syft(project_path))
+            
+        for lang in languages:
+            if lang != "python":
+                raw_packages.extend(self._run_cdxgen(project_path, lang))
+                
+        packages = []
+        seen = set()
+        for pkg in raw_packages:
+            key = (pkg.get("name"), pkg.get("version"), pkg.get("ecosystem", ""))
+            if key not in seen:
+                seen.add(key)
+                packages.append(pkg)
+                
         if not packages:
             return []
             
@@ -64,7 +81,7 @@ class RealSBOMProvider(AbstractSBOMProvider):
                     {
                         "package": {
                             "name": pkg["name"],
-                            "ecosystem": "PyPI"
+                            "ecosystem": pkg["ecosystem"]
                         },
                         "version": pkg["version"]
                     }
@@ -160,3 +177,73 @@ class RealSBOMProvider(AbstractSBOMProvider):
             code_snippet=f"requirements.txt: {name}=={version}",
             fix_suggestion="최신 버전으로 업그레이드하세요"
         )
+
+    def _detect_languages(self, project_path: str) -> list[str]:
+        try:
+            p = Path(project_path)
+            langs = []
+            if (p / "requirements.txt").exists():
+                langs.append("python")
+            if (p / "package.json").exists():
+                langs.append("js")
+            if (p / "pom.xml").exists():
+                langs.append("java")
+            if (p / "go.mod").exists():
+                langs.append("go")
+            return langs
+        except Exception:
+            return []
+
+    def _run_cdxgen(self, project_path: str, language: str) -> list[dict]:
+        import tempfile
+        import shutil
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+                tmp_path = str(tmp.name)
+            
+            try:
+                cmd = shutil.which("cdxgen") or "cdxgen"
+                subprocess.run(
+                    [cmd, project_path, "-t", language, "-o", tmp_path],
+                    capture_output=True, timeout=120
+                )
+                
+                if not Path(tmp_path).exists() or Path(tmp_path).stat().st_size == 0:
+                    return []
+                
+                with open(tmp_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                packages = []
+                PURL_ECOSYSTEM_MAP = {
+                    "pypi": "PyPI",
+                    "npm": "npm",
+                    "maven": "Maven",
+                    "golang": "Go",
+                    "cargo": "crates.io"
+                }
+                
+                for component in data.get("components", []):
+                    name = component.get("name")
+                    version = component.get("version")
+                    purl = component.get("purl", "")
+                    
+                    if not name or not version:
+                        continue
+                        
+                    if purl.startswith("pkg:"):
+                        type_str = purl[4:].split("/", 1)[0]
+                        ecosystem = PURL_ECOSYSTEM_MAP.get(type_str, type_str)
+                    else:
+                        ecosystem = ""
+                    
+                    packages.append({
+                        "name": name,
+                        "version": version,
+                        "ecosystem": ecosystem
+                    })
+                return packages
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        except Exception:
+            return []
