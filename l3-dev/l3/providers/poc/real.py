@@ -3,31 +3,17 @@ import subprocess
 from l3.providers.base import AbstractPoCProvider
 from l3.schema import VulnRecord
 from l3.llm.base import LLMAdapter
+from l3.providers.poc.template_registry import TemplateRegistry
 
 class RealPoCProvider(AbstractPoCProvider):
 
     DOCKER_IMAGE = "vsh-poc-target"
 
-    TEMPLATE_MAP = {
-        "CWE-89": "sqli_basic",
-    }
-
-    PAYLOAD_MAP = {
-        "sqli_basic": ["' OR '1'='1"],
-    }
-
-    SUCCESS_PATTERN = {
-        "sqli_basic": "VULNERABLE",
-    }
-
     def __init__(self, llm: LLMAdapter) -> None:
         self.llm = llm
 
-    def _select_template(self, cwe_id: str) -> str | None:
-        return self.TEMPLATE_MAP.get(cwe_id)
-
-    def _load_payloads(self, template_name: str) -> list[str]:
-        return self.PAYLOAD_MAP.get(template_name, [])
+    def _load_payloads(self, cwe_id: str) -> list[str]:
+        return TemplateRegistry.load(cwe_id)
 
     async def _run_poc(self, payload: str) -> bool:
         proc = None
@@ -85,13 +71,7 @@ class RealPoCProvider(AbstractPoCProvider):
                 record.status = "poc_skipped"
                 return record
                 
-            template_name = self._select_template(record.cwe_id)
-            if template_name is None:
-                print(f"[L3 PoC] 템플릿 없음: {record.cwe_id}")
-                record.status = "poc_skipped"
-                return record
-                
-            payloads = self._load_payloads(template_name)
+            payloads = self._load_payloads(record.cwe_id)
             if not payloads:
                 record.status = "poc_skipped"
                 return record
