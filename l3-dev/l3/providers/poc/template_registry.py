@@ -1,52 +1,41 @@
-import urllib.request
-import urllib.parse
 from pathlib import Path
 
 _BASE = Path(__file__).parent
 _CACHE = _BASE / "payloads"
 
 class TemplateRegistry:
-    CWE_TO_FOLDER = {
-        "CWE-89": "SQL Injection",
-        # "CWE-79": "XSS Injection",       # 추후 확장
-        # "CWE-78": "Command Injection",    # 추후 확장
-        # "CWE-22": "Path Traversal",       # 추후 확장
+    FILE_MAP = {
+        "CWE-89": "SQL Injection/Intruder/Auth_Bypass.txt",
+        "CWE-79": "XSS Injection/Intruders/IntrudersXSS.txt",
+        "CWE-78": "Command Injection/Intruder/command_exec.txt",
     }
-
-    FILE_NAME_MAP = {
-        "SQL Injection": "Auth_Bypass.txt",
-        # 추후 CWE 추가 시 여기에 파일명 함께 추가
-    }
-
-    BASE_URL = "https://raw.githubusercontent.com/swisskyrepo/PayloadsAllTheThings/master"
 
     @staticmethod
-    def load(cwe_id: str) -> list[str]:
+    def load(cwe_id: str, max_payloads: int = 50) -> list[str]:
         try:
-            folder_name = TemplateRegistry.CWE_TO_FOLDER.get(cwe_id)
-            if not folder_name:
+            relative_path_str = TemplateRegistry.FILE_MAP.get(cwe_id)
+            if not relative_path_str:
                 return []
                 
-            file_name = TemplateRegistry.FILE_NAME_MAP.get(folder_name)
-            if not file_name:
-                return []
-                
-            cache_file = _CACHE / folder_name / "Intruder" / file_name
+            # Path 객체에 문자열을 그대로 넘기면 OS에 따라 슬래시 처리 문제가 발생할 수 있으므로
+            # split("/")을 통해 각각의 파트를 넘겨 안전하게 조합합니다.
+            cache_file = _CACHE.joinpath(*relative_path_str.split("/"))
             
             if not cache_file.exists():
-                encoded_folder = urllib.parse.quote(folder_name, safe="")
-                url = f"{TemplateRegistry.BASE_URL}/{encoded_folder}/Intruder/{file_name}"
-                
-                with urllib.request.urlopen(url) as response:
-                    data = response.read()
-                    
-                cache_file.parent.mkdir(parents=True, exist_ok=True)
-                cache_file.write_bytes(data)
+                return []
                 
             text = cache_file.read_text(encoding="utf-8")
             lines = text.splitlines()
-            payloads = [l.strip() for l in lines if l.strip() != ""]
-            return payloads
+            
+            # 필터링: 빈 줄 및 주석 제거
+            filtered_payloads = [
+                l.strip() for l in lines 
+                if l.strip() and not l.strip().startswith("#")
+            ]
+            
+            # 슬라이싱
+            return filtered_payloads[:max_payloads]
             
         except Exception:
             return []
+

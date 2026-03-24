@@ -1,4 +1,4 @@
-# test_vuln.py
+# vuln_sample.py
 # 포함된 취약점:
 #   CWE-89: SQL Injection     (SonarQube 규칙: python:S3649)
 #   CWE-78: OS Cmd Injection  (SonarQube 규칙: python:S2076)

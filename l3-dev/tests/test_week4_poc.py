@@ -68,9 +68,9 @@ def test_poc_skipped_no_cwe_id():
     provider._run_poc.assert_not_called()
 
 def test_poc_skipped_no_template():
-    """TEMPLATE_MAP 에 없는 CWE 시 poc_skipped"""
+    """TEMPLATE_MAP 에 없는 CWE 아이디면 poc_skipped"""
     provider = RealPoCProvider(llm=MagicMock())
-    record = make_record(cwe_id="CWE-79")
+    record = make_record(cwe_id="CWE-999")
     provider._run_poc = AsyncMock()
 
     result = asyncio.run(provider.verify(record))
