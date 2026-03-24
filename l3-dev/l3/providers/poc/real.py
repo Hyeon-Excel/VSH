@@ -15,7 +15,7 @@ class RealPoCProvider(AbstractPoCProvider):
     def _load_payloads(self, cwe_id: str) -> list[str]:
         return TemplateRegistry.load(cwe_id)
 
-    async def _run_poc(self, payload: str) -> bool:
+    async def _run_poc(self, cwe_id: str, payload: str) -> bool:
         proc = None
         try:
             cmd = [
@@ -45,7 +45,7 @@ class RealPoCProvider(AbstractPoCProvider):
                 
             await asyncio.to_thread(
                 lambda: proc.stdin.write(
-                    (payload + "\n").encode()
+                    (f"{cwe_id}|{payload}\n").encode()
                 )
             )
             await asyncio.to_thread(lambda: proc.stdin.flush())
@@ -77,7 +77,7 @@ class RealPoCProvider(AbstractPoCProvider):
                 return record
                 
             for payload in payloads:
-                result = await self._run_poc(payload)
+                result = await self._run_poc(record.cwe_id, payload)
                 if result:
                     record.status = "poc_verified"
                     return record
