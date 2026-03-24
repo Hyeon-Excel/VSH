@@ -2,6 +2,253 @@
 
 > 팀: 분위기 지켜 | 담당: Lucas | 브랜치: `L3-dev`
 
+## 업데이트 사항
+## PoC 검증 엔진 (M3)
+
+### 지원 CWE 목록
+
+| CWE | 취약점 유형 | 검증 결과 | 페이로드 출처 |
+|-----|-----------|---------|-------------|
+| CWE-89 | SQL Injection | poc_verified ✅ | PayloadsAllTheThings/SQL Injection |
+| CWE-78 | OS Command Injection | poc_verified ✅ | PayloadsAllTheThings/Command Injection |
+| CWE-79 | XSS | poc_verified ✅ | PayloadsAllTheThings/XSS Injection |
+
+---
+
+### 구조 개요
+
+페이로드 공급과 검증이 분리된 구조입니다.
+
+```
+template_registry.py     페이로드 공급
+  FILE_MAP: CWE ID → PayloadsAllTheThings 파일 경로
+  자동 필터링: 빈 줄, 주석(#) 제거
+  기본값: 앞 50개 사용
+
+Docker PoC (vsh-poc-target)     검증 실행
+  app.py: CWE ID 기반 Dispatcher
+  routes/sqli.py: CWE-89 SQLi 검증
+  routes/cmdi.py: CWE-78 Command Injection 검증
+  routes/xss.py:  CWE-79 XSS 패턴 매칭 검증
+```
+
+통신 프로토콜: `stdin → "CWE-ID|페이로드"` 한 줄 전송
+
+---
+
+### Docker 이미지 빌드
+
+최초 1회 또는 routes 파일 변경 시 재빌드가 필요합니다.
+
+```powershell
+docker build -t vsh-poc-target l3\providers\poc\docker\
+```
+
+---
+
+### 새 CWE 추가 방법
+
+CWE 하나를 추가할 때 수정하는 파일은 총 3개입니다.
+`pipeline.py`, `mcp_server.py`, `real.py`는 수정하지 않습니다.
+
+**Step 1 — 페이로드 파일 추가**
+
+PayloadsAllTheThings 레포에서 해당 CWE의 페이로드 파일을 확인하고
+아래 경로에 넣습니다.
+
+```
+l3/providers/poc/payloads/
+└── 폴더명/
+    └── Intruder/
+        └── 파일명.txt
+```
+
+**Step 2 — template_registry.py FILE_MAP 한 줄 추가**
+
+```python
+# l3/providers/poc/template_registry.py
+
+FILE_MAP = {
+    "CWE-89": "SQL Injection/Intruder/Auth_Bypass.txt",
+    "CWE-78": "Command Injection/Intruder/command_exec.txt",
+    "CWE-79": "XSS Injection/Intruders/IntrudersXSS.txt",
+    "CWE-22": "Path Traversal/Intruder/path_traversal.txt",  # 추가
+}
+```
+
+**Step 3 — docker/routes/새파일.py 작성**
+
+검증 함수 하나만 구현합니다.
+반환값은 `bool`입니다. `True`면 VULNERABLE, `False`면 SAFE.
+모든 예외는 내부에서 처리하고 `False`를 반환합니다.
+
+```python
+# l3/providers/poc/docker/routes/ptrav.py 예시
+
+import os
+
+def check_ptrav(payload: str) -> bool:
+    try:
+        base_dir = "/tmp/safe"
+        target = os.path.normpath(os.path.join(base_dir, payload))
+        if not target.startswith(base_dir):
+            return True
+        return False
+    except Exception:
+        return False
+```
+
+**Step 4 — docker/app.py DISPATCHER 등록**
+
+```python
+# l3/providers/poc/docker/app.py
+
+from routes.ptrav import check_ptrav  # import 추가
+
+DISPATCHER = {
+    "CWE-89": ...,
+    "CWE-78": ...,
+    "CWE-79": ...,
+    "CWE-22": check_ptrav,            # 한 줄 추가
+}
+```
+
+**Step 5 — Docker 이미지 재빌드**
+
+```powershell
+docker build -t vsh-poc-target l3\providers\poc\docker\
+```
+
+**Step 6 — 검증**
+
+```powershell
+python -m e2e.test_l3_e2e_real
+```
+
+CWE ID가 탐지되면 자동으로 template_registry에서 페이로드를 로딩하고
+Docker Dispatcher가 해당 검증 함수를 실행합니다.
+
+---
+
+### 페이로드 필터링 규칙
+
+`template_registry.py`의 `load()` 메서드는 아래 순서로 필터링합니다.
+
+```
+1. 빈 줄 제거
+2. #으로 시작하는 주석 줄 제거
+3. 앞 50개만 사용 (max_payloads=50)
+```
+
+`max_payloads` 값은 `load()` 호출 시 변경 가능합니다.
+
+```python
+TemplateRegistry.load("CWE-89", max_payloads=30)
+```
+
+---
+
+### 주의사항
+
+```
+Docker 이미지 재빌드를 빠뜨리면
+새로 추가한 routes 파일이 컨테이너 안에 없어서
+DISPATCHER 분기가 동작하지 않습니다.
+
+routes 파일을 수정하거나 추가한 경우
+반드시 재빌드 후 테스트하십시오.
+```
+## 개요
+
+CWE-89(SQLi)만 poc_verified 가능하던 구조를
+CWE-78(CmdI), CWE-79(XSS)까지 확장했습니다.
+페이로드 공급과 검증 로직이 분리된 반자동화 구조입니다.
+
+---
+
+## 변경 배경
+
+기존 문제:
+- `PAYLOAD_MAP`에 페이로드를 직접 하드코딩 (3~5개)
+- CWE 추가 시 페이로드 조사 + 코드 작성 1~2시간 소요
+- Docker가 CWE ID를 모르고 무조건 SQLi 검증만 실행
+- CWE-78/79 페이로드가 들어와도 항상 SAFE 반환
+
+---
+
+## 변경 내용
+
+### template_registry.py — 페이로드 공급 반자동화
+
+| 항목 | 변경 전 | 변경 후 |
+|------|--------|--------|
+| 페이로드 출처 | 코드에 하드코딩 | PayloadsAllTheThings 파일 |
+| 지원 CWE | CWE-89 | CWE-89 / CWE-78 / CWE-79 |
+| 페이로드 수 | 3~5개 | 최대 50개 |
+| 네트워크 의존 | 런타임 GitHub 다운로드 | 완전 로컬 오프라인 |
+| 새 CWE 추가 | 직접 작성 | FILE_MAP 한 줄 |
+
+### Docker Dispatcher — CWE별 검증 분기
+
+| 항목 | 변경 전 | 변경 후 |
+|------|--------|--------|
+| 통신 프로토콜 | `payload` | `CWE-ID\|payload` |
+| 검증 분기 | 무조건 sqli.py | CWE ID 기반 Dispatcher |
+| 신규 파일 | 없음 | routes/cmdi.py, routes/xss.py |
+
+---
+
+## 테스트 결과
+
+```
+단독 검증:
+  CWE-89: poc_verified ✅
+  CWE-78: poc_verified ✅
+  CWE-79: poc_verified ✅
+
+pytest:
+  106/106 PASSED (회귀 없음)
+```
+
+---
+
+## 수정된 파일 목록
+
+```
+수정:
+  l3/providers/poc/template_registry.py
+  l3/providers/poc/docker/app.py
+  l3/providers/poc/real.py
+  tests/test_week4_poc.py
+
+신규:
+  l3/providers/poc/docker/routes/cmdi.py
+  l3/providers/poc/docker/routes/xss.py
+  l3/providers/poc/payloads/XSS Injection/Intruders/IntrudersXSS.txt
+  l3/providers/poc/payloads/Command Injection/Intruder/command_exec.txt
+  tests/test_template_registry.py
+  vuln_sample.py
+  e2e/test_vuln.py
+```
+
+---
+
+## 팀 통합 시 참고사항
+
+L3는 독립 레이어로 동작합니다.
+팀 통합 시 `mcp_server.py`에서 아래 한 줄만 교체하면 됩니다.
+
+```python
+# 변경 전
+from l3.mock_shared_db import MockSharedDB
+
+# 변경 후
+from l3.real_shared_db import RealSharedDB
+```
+
+
+
+
 ## 한 줄 요약
 
 개발자가 코딩하는 동안 백그라운드에서 SonarQube + SBOM + PoC 를 실행하고,
