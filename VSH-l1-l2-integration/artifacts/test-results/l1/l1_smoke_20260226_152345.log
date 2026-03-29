@@ -1,0 +1,7 @@
+L1 smoke checks passed.
+- semgrep_bin: /Users/hyeonexcel/Documents/Workspace/VSH/.venv/bin/semgrep
+- python_engine: semgrep-cli
+- python_findings: 1
+- js_findings: 1
+- fallback_findings: 1
+- python_import_candidates: 1

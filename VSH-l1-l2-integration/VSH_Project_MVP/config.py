@@ -1,0 +1,24 @@
+from pathlib import Path
+
+# Project Root
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+# Base directory for Mock DB
+MOCK_DB_DIR = PROJECT_ROOT / "mock_db"
+CHROMA_DB_DIR = PROJECT_ROOT / ".chroma_db"
+CHROMA_CACHE_DIR = PROJECT_ROOT / ".cache" / "chroma"
+CHROMA_COLLECTION = "vsh_kisa_guide"
+
+# Paths for read-only repositories
+KNOWLEDGE_PATH = str(MOCK_DB_DIR / "knowledge.json")
+FIX_PATH = str(MOCK_DB_DIR / "kisa_fix.json")
+LOG_PATH = str(MOCK_DB_DIR / "log.json")
+
+# Vulnerable Packages for SBOM Scanner
+VULNERABLE_PACKAGES = {
+    "requests": {"vulnerable_below": "2.20.0", "cve": "CVE-2018-18074"},
+    "flask": {"vulnerable_below": "1.0.0", "cve": "CVE-2018-1000656"},
+    "django": {"vulnerable_below": "3.2.0", "cve": "CVE-2021-33203"},
+    "pyyaml": {"vulnerable_below": "6.0.0", "cve": "CVE-2022-1471"},
+    "pillow": {"vulnerable_below": "9.0.0", "cve": "CVE-2022-22817"}
+}

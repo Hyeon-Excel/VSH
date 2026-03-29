@@ -1,0 +1,64 @@
+..........FF.F                                                           [100%]
+=================================== FAILURES ===================================
+_______________ test_l1_detects_python_sqli_and_secret_together ________________
+
+    def test_l1_detects_python_sqli_and_secret_together() -> None:
+        service = L1Service()
+        response = service.scan_annotate(
+            L1ScanAnnotateRequest(
+                code=_load_fixture("python_multi_bad.py"),
+                language="python",
+                file_path="tests/fixtures/python_multi_bad.py",
+                mode=ScanMode.FILE,
+            )
+        )
+    
+        rule_ids = {finding.rule_id for finding in response.findings}
+        assert "vsh.python.sqli.fstring" in rule_ids
+>       assert "vsh.common.secret.hardcoded" in rule_ids
+E       AssertionError: assert 'vsh.common.secret.hardcoded' in {'vsh.python.sqli.fstring'}
+
+tests/test_l1_vuln_samples.py:29: AssertionError
+______________ test_l1_detects_javascript_xss_and_secret_together ______________
+
+    def test_l1_detects_javascript_xss_and_secret_together() -> None:
+        service = L1Service()
+        response = service.scan_annotate(
+            L1ScanAnnotateRequest(
+                code=_load_fixture("javascript_multi_bad.js"),
+                language="javascript",
+                file_path="tests/fixtures/javascript_multi_bad.js",
+                mode=ScanMode.FILE,
+            )
+        )
+    
+        rule_ids = {finding.rule_id for finding in response.findings}
+        assert "vsh.js.xss.innerhtml" in rule_ids
+>       assert "vsh.common.secret.hardcoded" in rule_ids
+E       AssertionError: assert 'vsh.common.secret.hardcoded' in {'vsh.js.xss.innerhtml'}
+
+tests/test_l1_vuln_samples.py:46: AssertionError
+__________________ test_l1_detects_multiple_hardcoded_secrets __________________
+
+    def test_l1_detects_multiple_hardcoded_secrets() -> None:
+        service = L1Service()
+        response = service.scan_annotate(
+            L1ScanAnnotateRequest(
+                code=_load_fixture("secrets_multiple_bad.txt"),
+                language="auto",
+                file_path="tests/fixtures/secrets_multiple_bad.txt",
+                mode=ScanMode.FILE,
+            )
+        )
+    
+        secret_hits = [finding for finding in response.findings if finding.rule_id == "vsh.common.secret.hardcoded"]
+>       assert len(secret_hits) >= 2
+E       assert 0 >= 2
+E        +  where 0 = len([])
+
+tests/test_l1_vuln_samples.py:75: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_l1_vuln_samples.py::test_l1_detects_python_sqli_and_secret_together
+FAILED tests/test_l1_vuln_samples.py::test_l1_detects_javascript_xss_and_secret_together
+FAILED tests/test_l1_vuln_samples.py::test_l1_detects_multiple_hardcoded_secrets
+3 failed, 11 passed in 11.68s

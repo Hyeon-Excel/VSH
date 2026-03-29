@@ -1,0 +1,69 @@
+{
+  "findings": [
+    {
+      "id": "l1-a1fe71a3539b",
+      "rule_id": "vsh.common.secret.hardcoded",
+      "severity": "HIGH",
+      "category": "CODE",
+      "location": {
+        "file_path": "/Users/hyeonexcel/Documents/Workspace/VSH/tests/fixtures/python_multi_bad.py",
+        "start_line": 3,
+        "start_col": 1,
+        "end_line": 3,
+        "end_col": 37
+      },
+      "cwe": [
+        "CWE-798"
+      ],
+      "owasp": [
+        "A02"
+      ],
+      "kisa_key": "SECRETS_MANAGEMENT_1",
+      "fsec_key": "COMMON_1_1",
+      "message": "Potential hardcoded secret detected.",
+      "reachability_hint": "UNKNOWN",
+      "confidence": 0.8,
+      "evidence_refs": [],
+      "rationale": null,
+      "recommendation": null
+    },
+    {
+      "id": "l1-004cb3a4a89f",
+      "rule_id": "vsh.python.sqli.fstring",
+      "severity": "HIGH",
+      "category": "CODE",
+      "location": {
+        "file_path": "/Users/hyeonexcel/Documents/Workspace/VSH/tests/fixtures/python_multi_bad.py",
+        "start_line": 7,
+        "start_col": 5,
+        "end_line": 7,
+        "end_col": 65
+      },
+      "cwe": [
+        "CWE-89"
+      ],
+      "owasp": [
+        "A03"
+      ],
+      "kisa_key": "INPUT_VALIDATION_1",
+      "fsec_key": "WEB_3_1",
+      "message": "Potential SQL injection via string interpolation.",
+      "reachability_hint": "YES",
+      "confidence": 0.9,
+      "evidence_refs": [],
+      "rationale": null,
+      "recommendation": null
+    }
+  ],
+  "import_candidates": [
+    {
+      "package_name": "sqlite3",
+      "line": 1,
+      "source_type": "import",
+      "extraction_method": "tree-sitter"
+    }
+  ],
+  "annotation_patch": "",
+  "timing_ms": 1278,
+  "errors": []
+}

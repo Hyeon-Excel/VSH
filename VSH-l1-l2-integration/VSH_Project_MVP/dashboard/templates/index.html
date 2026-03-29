@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VSH 보안 진단 대시보드</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+            --high-color: #ef4444;
+            --medium-color: #f97316;
+            --low-color: #eab308;
+            --accepted-bg: #dcfce7;
+            --dismissed-bg: #f1f5f9;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .stats {
+            font-size: 1rem;
+            color: #64748b;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease;
+        }
+
+        .card.accepted {
+            background-color: var(--accepted-bg);
+        }
+
+        .card.dismissed {
+            background-color: var(--dismissed-bg);
+            opacity: 0.8;
+        }
+
+        .card.analysis_failed {
+            background-color: #fff1f2;
+            border-color: #fecdd3;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+        }
+
+        .badge.high { background-color: var(--high-color); }
+        .badge.medium { background-color: var(--medium-color); }
+        .badge.low { background-color: var(--low-color); }
+
+        .issue-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 0 0 4px 0;
+        }
+
+        .issue-meta {
+            font-size: 0.9rem;
+            color: #475569;
+        }
+
+        .code-block {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: "Fira Code", Consolas, Monaco, monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 12px 0;
+            white-space: pre-wrap;
+        }
+
+        .analysis-grid {
+            display: grid;
+            gap: 10px;
+            margin: 14px 0;
+        }
+
+        .analysis-item {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: #f8fafc;
+            padding: 12px;
+        }
+
+        .analysis-item strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        .analysis-item p {
+            margin: 0;
+            color: #334155;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .analysis-item.error {
+            border-color: #fecaca;
+            background-color: #fef2f2;
+        }
+
+        .analysis-item.error p {
+            color: #991b1b;
+        }
+
+        .issue-status {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .issue-status.failed {
+            color: #b91c1c;
+        }
+
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: #3b82f6;
+            cursor: pointer;
+            font-weight: bold;
+            padding: 0;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .toggle-btn:hover {
+            text-decoration: underline;
+        }
+
+        .fixed-code-container {
+            display: none;
+            margin-top: 8px;
+        }
+
+        .fixed-code-container.open {
+            display: block;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .btn-accept {
+            background-color: #22c55e;
+            color: white;
+        }
+
+        .btn-accept:hover:not(:disabled) {
+            background-color: #16a34a;
+        }
+
+        .btn-dismiss {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .btn-dismiss:hover:not(:disabled) {
+            background-color: #dc2626;
+        }
+
+        .fallback-textarea {
+            width: 100%;
+            height: 100px;
+            margin-top: 8px;
+            font-family: monospace;
+            padding: 8px;
+            box-sizing: border-box;
+            display: none;
+        }
+
+        .refresh-btn {
+            background-color: #3b82f6;
+            color: white;
+            font-size: 1rem;
+            padding: 10px 20px;
+            display: block;
+            margin: 20px auto;
+        }
+        
+        .refresh-btn:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡 VSH 보안 진단 대시보드</h1>
+            <div class="stats" id="stats-container">로딩 중...</div>
+        </header>
+
+        <div id="logs-container">
+            <!-- 취약점 카드들이 여기에 렌더링됩니다 -->
+        </div>
+
+        <button class="refresh-btn" onclick="fetchLogs()">새로고침</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', fetchLogs);
+
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+                renderLogs(data.logs);
+                updateStats(data.logs);
+            } catch (error) {
+                console.error("Failed to fetch logs:", error);
+                document.getElementById('logs-container').innerHTML = '<p style="color:red;">로그를 불러오는데 실패했습니다.</p>';
+            }
+        }
+
+        function updateStats(logs) {
+            const total = logs.length;
+            const pendingCount = logs.filter(l => l.status === 'pending').length;
+            const failedCount = logs.filter(l => l.status === 'analysis_failed').length;
+            const highConfidenceCount = logs.filter(l => Number(l.confidence_score || 0) >= 85).length;
+            document.getElementById('stats-container').textContent = `총 ${total}개 취약점 | pending: ${pendingCount}개 | failed: ${failedCount}개 | high confidence: ${highConfidenceCount}개`;
+        }
+
+        function renderLogs(logs) {
+            const container = document.getElementById('logs-container');
+            container.innerHTML = ''; // Clear existing
+
+            if (logs.length === 0) {
+                container.innerHTML = '<p>저장된 분석 결과가 없습니다.</p>';
+                return;
+            }
+
+            logs.forEach(log => {
+                const card = document.createElement('div');
+                card.className = `card ${log.status}`;
+                card.id = `card-${log.issue_id}`;
+                const issueId = JSON.stringify(log.issue_id);
+
+                const badgeClass = log.severity ? log.severity.toLowerCase() : 'low';
+                
+                // Set button states and text based on current status
+                let acceptText = 'Accept';
+                let dismissText = 'Dismiss';
+                let acceptDisabled = false;
+                let dismissDisabled = false;
+
+                if (log.status === 'accepted') {
+                    acceptText = '✅ 복사됨';
+                    acceptDisabled = true;
+                    dismissDisabled = true;
+                } else if (log.status === 'dismissed') {
+                    dismissText = '❌ 무시됨';
+                    acceptDisabled = true;
+                    dismissDisabled = true;
+                } else if (log.status === 'analysis_failed') {
+                    acceptText = 'L2 실패';
+                    acceptDisabled = true;
+                }
+
+                const analysisItems = [
+                    renderAnalysisItem('L2 Vuln ID', log.l2_vuln_record?.vuln_id),
+                    renderAnalysisItem('L2 Schema Source', log.l2_vuln_record?.source),
+                    renderAnalysisItem('L1 Rule ID', log.rule_id),
+                    renderAnalysisItem('L1 Reachability', log.l1_reachability_status),
+                    renderAnalysisItem(
+                        'L1 References',
+                        Array.isArray(log.l1_references) ? log.l1_references.join('\n') : '',
+                    ),
+                    renderAnalysisItem('수정 설명', log.description),
+                    renderAnalysisItem('Reachability', log.reachability),
+                    renderAnalysisItem('KISA Reference', log.kisa_reference),
+                    renderAnalysisItem('Evidence Summary', log.evidence_summary),
+                    renderAnalysisItem('Retrieval Backend', log.retrieval_backend),
+                    renderAnalysisItem('Chroma Status', log.chroma_status),
+                    renderAnalysisItem('Chroma Summary', log.chroma_summary),
+                    renderAnalysisItem('Chroma Hits', log.chroma_hits),
+                    renderAnalysisItem(
+                        'Evidence Refs',
+                        Array.isArray(log.evidence_refs) ? log.evidence_refs.join('\n') : '',
+                    ),
+                    renderAnalysisItem('Registry Verification', formatVerification(log.registry_status, log.registry_summary)),
+                    renderAnalysisItem('OSV Verification', formatVerification(log.osv_status, log.osv_summary)),
+                    renderAnalysisItem('Verification Summary', log.verification_summary),
+                    renderAnalysisItem('Decision Status', log.decision_status),
+                    renderAnalysisItem('Confidence Score', log.confidence_score),
+                    renderAnalysisItem('Confidence Reason', log.confidence_reason),
+                    renderAnalysisItem('Patch Status', log.patch_status),
+                    renderAnalysisItem('Patch Summary', log.patch_summary),
+                    renderAnalysisItem('Processing Summary', log.processing_summary),
+                    renderAnalysisItem('Category', log.category),
+                    renderAnalysisItem('Remediation Kind', log.remediation_kind),
+                    renderAnalysisItem('Target Ref', log.target_ref),
+                    renderAnalysisItem(
+                        'Processing Trace',
+                        Array.isArray(log.processing_trace) ? log.processing_trace.join('\n') : '',
+                    ),
+                    renderAnalysisItem('L2 오류', log.analysis_error, true),
+                ].filter(Boolean).join('');
+
+                const patchSection = log.patch_diff ? `
+                    <div style="margin-top: 12px;"><strong>Patch Preview:</strong></div>
+                    <div class="code-block">${escapeHtml(log.patch_diff)}</div>
+                ` : '';
+
+                const statusLabel = log.status === 'analysis_failed'
+                    ? '<div class="issue-status failed">L2 분석에 실패했습니다. 수정 제안 없이 탐지 결과만 저장되었습니다.</div>'
+                    : '';
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <h3 class="issue-title">${escapeHtml(log.cwe_id || 'UNKNOWN')}</h3>
+                            <div class="issue-meta">${escapeHtml(log.file_path || '')} (Line: ${escapeHtml(String(log.line_number ?? ''))})</div>
+                            <div class="issue-meta" style="font-size:0.8rem; margin-top:4px; color:#666;">ID: ${escapeHtml(log.issue_id || '')}</div>
+                            ${statusLabel}
+                        </div>
+                        <span class="badge ${badgeClass}">${escapeHtml(log.severity || 'LOW')}</span>
+                    </div>
+                    
+                    <div style="margin-bottom: 8px;"><strong>원본 코드:</strong></div>
+                    <div class="code-block">${escapeHtml(log.original_code || log.code_snippet)}</div>
+                    ${analysisItems ? `<div class="analysis-grid">${analysisItems}</div>` : ''}
+                    ${patchSection}
+
+                    <button class="toggle-btn" onclick='toggleFixedCode(${issueId})'>수정 코드 보기 ▼</button>
+                    
+                    <div id="fixed-code-${log.issue_id}" class="fixed-code-container">
+                        <div class="code-block" style="background-color: #0f172a;">${escapeHtml(log.fixed_code || '제공된 수정 코드가 없습니다.')}</div>
+                    </div>
+                    
+                    <textarea id="fallback-${log.issue_id}" class="fallback-textarea" readonly>${log.fixed_code || ''}</textarea>
+
+                    <div class="actions">
+                        <button id="btn-accept-${log.issue_id}" class="btn-accept" 
+                                onclick='handleAccept(${issueId})' 
+                                ${acceptDisabled ? 'disabled' : ''}>${acceptText}</button>
+                                
+                        <button id="btn-dismiss-${log.issue_id}" class="btn-dismiss" 
+                                onclick='handleDismiss(${issueId})' 
+                                ${dismissDisabled ? 'disabled' : ''}>${dismissText}</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderAnalysisItem(label, value, isError = false) {
+            if (value === null || value === undefined || value === '') {
+                return '';
+            }
+            const className = isError ? 'analysis-item error' : 'analysis-item';
+            return `
+                <div class="${className}">
+                    <strong>${label}</strong>
+                    <p>${escapeHtml(String(value))}</p>
+                </div>
+            `;
+        }
+
+        function formatVerification(status, summary) {
+            if (!status && !summary) {
+                return '';
+            }
+            if (status && summary) {
+                return `[${status}] ${summary}`;
+            }
+            return status || summary || '';
+        }
+
+        function toggleFixedCode(issueId) {
+            const container = document.getElementById(`fixed-code-${issueId}`);
+            container.classList.toggle('open');
+            const btn = container.previousElementSibling;
+            if (container.classList.contains('open')) {
+                btn.textContent = '수정 코드 닫기 ▲';
+            } else {
+                btn.textContent = '수정 코드 보기 ▼';
+            }
+        }
+
+        async function handleAccept(issueId) {
+            try {
+                const response = await fetch(`/api/logs/${issueId}/accept`, { method: 'POST' });
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || 'Accept failed');
+                }
+                const data = await response.json();
+                
+                // UI 업데이트
+                const card = document.getElementById(`card-${issueId}`);
+                card.className = 'card accepted';
+                
+                const acceptBtn = document.getElementById(`btn-accept-${issueId}`);
+                const dismissBtn = document.getElementById(`btn-dismiss-${issueId}`);
+                
+                dismissBtn.disabled = true;
+                acceptBtn.disabled = true;
+
+                // 클립보드 복사 시도
+                const fixedCode = data.fixed_code || '';
+                try {
+                    await navigator.clipboard.writeText(fixedCode);
+                    acceptBtn.textContent = '✅ 복사됨';
+                } catch (err) {
+                    console.error('Clipboard copy failed:', err);
+                    acceptBtn.textContent = '✅ 승인됨 (복사 실패)';
+                    // Fallback: show textarea so user can manually copy
+                    document.getElementById(`fallback-${issueId}`).style.display = 'block';
+                }
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function handleDismiss(issueId) {
+            try {
+                const response = await fetch(`/api/logs/${issueId}/dismiss`, { method: 'POST' });
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || 'Dismiss failed');
+                }
+                
+                // UI 업데이트
+                const card = document.getElementById(`card-${issueId}`);
+                card.className = 'card dismissed';
+                
+                const acceptBtn = document.getElementById(`btn-accept-${issueId}`);
+                const dismissBtn = document.getElementById(`btn-dismiss-${issueId}`);
+                
+                acceptBtn.disabled = true;
+                dismissBtn.disabled = true;
+                dismissBtn.textContent = '❌ 무시됨';
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // 유틸리티: XSS 방지를 위한 HTML 이스케이프
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>

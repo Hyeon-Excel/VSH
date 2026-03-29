@@ -1,0 +1,29 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Mock DB logs (Runtime generated data)
+# knowledge.json과 kisa_fix.json은 참조 데이터이므로 추적하지만, 
+# log.json은 런타임에 쌓이는 데이터이므로 추적하지 않습니다.
+mock_db/log.json
+
+# Test / Output files
+output_real.txt
+test_version.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp

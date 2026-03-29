@@ -1,0 +1,45 @@
+Metadata-Version: 2.4
+Name: vsh
+Version: 0.1.0
+Summary: Vibe Secure Helper MCP server
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic<3.0.0,>=2.8.0
+Provides-Extra: dev
+Requires-Dist: pytest<9.0.0,>=8.0.0; extra == "dev"
+Requires-Dist: ruff<1.0.0,>=0.6.0; extra == "dev"
+Provides-Extra: l1
+Requires-Dist: tree-sitter<1.0.0,>=0.21.3; extra == "l1"
+Requires-Dist: tree-sitter-languages<2.0.0,>=1.10.2; python_version < "3.13" and extra == "l1"
+Requires-Dist: tree-sitter-language-pack<1.0.0,>=0.13.0; python_version >= "3.13" and extra == "l1"
+Provides-Extra: mcp
+Requires-Dist: fastmcp>=0.1.0; extra == "mcp"
+
+# VSH
+
+VSH(Vibe Secure Helper)는 AI가 생성한 코드를 IDE 단계에서 점검하는 FastMCP 기반 보안 도우미입니다.
+
+## 현재 상태
+
+- 문서 중심의 기획 단계에서 구현 가능한 상세 설계 단계로 전환
+- `docs/architecture.md`, `docs/contracts.md`, `docs/roadmap.md` 추가
+- `src/vsh/` 패키지 스캐폴딩 및 레이어 인터페이스 스텁 추가
+- L1 MVP 구현 완료(스캔/정규화/주석 패치/테스트)
+
+## 핵심 목표
+
+- L1: 1초 내 정적 탐지 + 주석 패치
+- L2: 근거 보강(RAG) + 검증(OSV/Registry) + 수정 Diff
+- L3: 전체 스캔 + SBOM + 제출 가능한 리포트
+
+## 디렉터리
+
+- `docs/`: 실행 가능한 설계 문서
+- `src/vsh/`: MCP 서버 및 L1/L2/L3 구현
+- `tests/fixtures/`: 취약/안전 코드 샘플
+
+## 다음 구현 순서
+
+1. L2 검증/근거 계층 구현(RAG, Registry, OSV)
+2. L2 fix patch 생성기와 HITL 흐름 강화
+3. L3 스캔/리포트 계층 단계적 확장

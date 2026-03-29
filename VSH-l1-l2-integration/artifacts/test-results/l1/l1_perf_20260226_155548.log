@@ -1,0 +1,8 @@
+L1 perf checks passed.
+- cache_miss_p50_ms: 957.32
+- cache_miss_p95_ms: 979.38
+- cache_hit_p50_ms: 0.13
+- cache_hit_p95_ms: 0.22
+- threshold_cache_miss_p95_ms: 2500
+- threshold_cache_hit_p95_ms: 200
+- perf_json: /Users/hyeonexcel/Documents/Workspace/VSH/artifacts/test-results/l1/l1_perf_20260226_155548.json

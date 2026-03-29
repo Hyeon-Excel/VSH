@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find . -type f -name *.py ! -path */__pycache__/* ! -path */.git/* ! -path */.venv/* ! -path */node_modules/*)",
+      "Bash(sort -t_ -k2 -r)",
+      "Bash(timeout 30 python -c \":*)",
+      "Bash(python -c \":*)",
+      "Bash(timeout 300 python -c \":*)",
+      "Bash(timeout 600 python -c \":*)",
+      "Bash(timeout 60 python -c \":*)"
+    ]
+  }
+}
