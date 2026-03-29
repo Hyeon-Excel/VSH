@@ -16,6 +16,9 @@ from models.vulnerability import Vulnerability
 from models.scan_result import ScanResult
 from models.fix_suggestion import FixSuggestion
 from models.common_schema import PackageRecord, VulnRecord
+from shared.logging_utils import get_logger
+
+LOGGER = get_logger(__name__)
 
 class AnalysisPipeline(BasePipeline):
     """
@@ -143,9 +146,9 @@ class AnalysisPipeline(BasePipeline):
                 if result:
                     all_results.append(result)
             except ValueError as e:
-                print(f"[WARN] Unsupported language: {e}")
+                LOGGER.warning("Unsupported language", extra={"error": str(e)})
             except Exception as e:
-                print(f"[WARN] Scanner execution failed: {e}")
+                LOGGER.warning("Scanner execution failed", extra={"error": str(e)})
         return all_results
 
     def _build_integrated_scan_result(self, file_path: str) -> ScanResult:

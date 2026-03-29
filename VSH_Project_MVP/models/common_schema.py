@@ -34,6 +34,10 @@ class VulnRecord(BaseModel):
     owasp_ref: str | None = None
     evidence: str
     fix_suggestion: str
+    detection_severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"] | None = None
+    reasoning_verdict: Literal["likely_vulnerable", "suspicious", "not_vulnerable", "needs_review"] | None = None
+    risk_score: float | None = None
+    final_priority: Literal["P1", "P2", "P3", "P4", "INFO"] | None = None
     status: Literal[
         "pending",
         "accepted",
@@ -75,3 +79,12 @@ class PackageRecord(BaseModel):
     status: Literal["safe", "upgrade_required", "license_violation"]
     fix_suggestion: str
     evidence: str
+    advisory_id: str | None = None
+    advisory_source: str | None = None
+    affected_module: str | None = None
+    affected_symbol: str | None = None
+    affected_api_patterns: list[str] = Field(default_factory=list)
+    exploitability_hint: str | None = None
+    usage_status: Literal["package_present", "package_imported", "vulnerable_api_referenced", "reachable_package_risk", "needs_manual_review"] | None = None
+    risk_score: float | None = None
+    final_priority: Literal["P1", "P2", "P3", "P4", "INFO"] | None = None

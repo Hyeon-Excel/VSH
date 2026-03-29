@@ -2,6 +2,8 @@ import json
 from typing import Any, Dict, List
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from vsh_runtime.engine import VshRuntimeEngine
+from vsh_runtime.watcher import ProjectWatcher
 
 # 1. 초기화 순서 준수: 환경변수 로드가 가장 먼저 수행되어야 함
 load_dotenv()
@@ -15,6 +17,7 @@ log_repo = pipeline.log_repo
 
 # 3. FastMCP 인스턴스 생성
 mcp = FastMCP("VSH - Vibe Coding Secure Helper")
+runtime_engine = VshRuntimeEngine()
 
 # hyeonexcel 수정: MCP 공개 계약을 문서(GEMINI.md, CONVENTIONS.md)와 맞추기 위해
 # 실제 비즈니스 로직은 내부 헬퍼로 모으고, 외부에 노출되는 tool 이름은 문서 기준으로 통일한다.
@@ -195,6 +198,31 @@ def update_status(issue_id: str, status: str) -> str:
         ensure_ascii=False,
         indent=2,
     )
+
+
+@mcp.tool()
+def analyze_file(file_path: str) -> Dict[str, Any]:
+    return runtime_engine.analyze_file(file_path)
+
+
+@mcp.tool()
+def analyze_project(project_path: str) -> Dict[str, Any]:
+    return runtime_engine.analyze_project(project_path)
+
+
+@mcp.tool()
+def get_diagnostics(target_path: str) -> Dict[str, Any]:
+    return runtime_engine.get_diagnostics(target_path)
+
+
+@mcp.tool()
+def watch_project(project_path: str, once: bool = True) -> Dict[str, Any]:
+    watcher = ProjectWatcher(project_path)
+    if once:
+        events = watcher.poll_once()
+        return {"events": events, "mode": "poll_once"}
+    watcher.watch_forever()
+    return {"started": True, "mode": "watch_forever"}
 
 if __name__ == "__main__":
     mcp.run()
