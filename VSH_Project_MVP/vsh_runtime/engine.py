@@ -5,8 +5,10 @@ from pathlib import Path
 
 from layer1.scanner.vsh_l1_scanner import VSHL1Scanner
 from layer2.reasoning import L2ReasoningPipeline
+from models.common_schema import VulnRecord
 from reporting.report_engine import ReportEngine
 from vsh_runtime.diagnostics import build_inline_preview, build_markdown_preview, vuln_to_diagnostic
+from vsh_runtime.l3_validator import L3Validator
 from vsh_runtime.risk import compute_package_risk, compute_vuln_risk
 from vsh_runtime.sca_usage import build_package_usage_index
 
@@ -15,6 +17,7 @@ class VshRuntimeEngine:
     def __init__(self):
         self.l1 = VSHL1Scanner()
         self.l2 = L2ReasoningPipeline()
+        self.l3 = L3Validator()
         self.report = ReportEngine()
 
     def analyze_file(self, file_path: str) -> dict:
@@ -59,6 +62,17 @@ class VshRuntimeEngine:
             p["risk_score"] = score
             p["final_priority"] = pri
 
+        reasoning_map = {r["linked_vuln_id"]: r for r in reasoning}
+        l3_results = self.l3.validate_many([VulnRecord(**v) for v in vulns], reasoning_map=reasoning_map) if vulns else []
+
+        # annotate vuln_records with L3 cache and inferred final
+        for v, l3 in zip(vulns, l3_results):
+            v["l3_validated"] = l3.get("validated")
+            v["exploit_possible"] = l3.get("exploit_possible")
+            v["l3_confidence"] = l3.get("confidence")
+            v["l3_attack_scenario"] = l3.get("attack_scenario")
+            v["l3_severity_override"] = l3.get("severity_override")
+
         diagnostics = [vuln_to_diagnostic(v).to_dict() for v in vulns]
         aggregate = self._build_aggregate(vulns, pkgs)
 
@@ -66,7 +80,7 @@ class VshRuntimeEngine:
             "vuln_records": vulns,
             "package_records": pkgs,
             "l2_reasoning_results": reasoning,
-            "l3_validation_results": [{"status": "queued", "mode": "cold_path"}],
+            "l3_validation_results": l3_results,
             "diagnostics": diagnostics,
             "aggregate_summary": aggregate,
         }

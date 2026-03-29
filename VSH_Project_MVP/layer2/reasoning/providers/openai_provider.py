@@ -7,29 +7,24 @@ from typing import Any
 from .base import ReasoningProvider
 
 try:
-    from google.genai import Client
-    from google.genai import types
-except ImportError:
-    Client = None
-    types = None
+    import openai
+except ImportError as e:
+    raise ImportError("OpenAI package required for OpenAIReasoningProvider: pip install openai") from e
 
 
-class GeminiReasoningProvider(ReasoningProvider):
-    name = "gemini"
-    model_name = "gemini-pro"
+class OpenAIReasoningProvider(ReasoningProvider):
+    name = "openai"
+    model_name = "gpt-4.1"
 
     def __init__(self, model: str | None = None, rate_limit_per_min: int = 60):
-        self.model = model or os.environ.get("GEMINI_MODEL", "gemini-pro")
+        self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
         self.rate_limit_per_min = rate_limit_per_min
         self._last_called = 0.0
 
-        if Client is None or types is None:
-            raise ImportError("google-genai package required for GeminiReasoningProvider: pip install google-genai")
-
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
-            raise EnvironmentError("GEMINI_API_KEY is required for GeminiReasoningProvider")
-        self.client = Client(api_key=api_key)
+            raise EnvironmentError("OPENAI_API_KEY is required for OpenAIReasoningProvider")
+        openai.api_key = api_key
 
     def _throttle(self):
         interval = 60.0 / self.rate_limit_per_min
@@ -37,6 +32,25 @@ class GeminiReasoningProvider(ReasoningProvider):
         elapsed = now - self._last_called
         if elapsed < interval:
             time.sleep(interval - elapsed)
+
+    def reason(self, vuln_record: dict, context: dict) -> dict:
+        self._throttle()
+        prompt = self._build_prompt(vuln_record, context)
+
+        resp = openai.ChatCompletion.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a secure code analyst."},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=450,
+            temperature=0.2,
+        )
+
+        self._last_called = time.time()
+
+        text = resp.choices[0].message.content.strip()
+        return self._parse_text_output(text, vuln_record)
 
     def _build_prompt(self, vuln_record: dict, context: dict) -> str:
         return (
@@ -49,11 +63,11 @@ class GeminiReasoningProvider(ReasoningProvider):
             f"- reachability_status: {vuln_record.get('reachability_status')}\n"
             f"- reachability_confidence: {vuln_record.get('reachability_confidence')}\n"
             f"Context (surrounding lines):\n{context.get('context')}\n"
-            "Based on this, return strict JSON with keys:"
-            "is_vulnerable, confidence, reasoning, attack_scenario, fix_suggestion, severity_override."
+            "Based on this, generate a JSON object exactly with keys:\n"
+            "is_vulnerable (true/false), confidence (0-1), reasoning, attack_scenario, fix_suggestion, severity_override (LOW/MEDIUM/HIGH/CRITICAL)."
         )
 
-    def _parse_response(self, text: str, vuln_record: dict, context: dict) -> dict:
+    def _parse_text_output(self, text: str, vuln_record: dict) -> dict:
         try:
             import json
 
@@ -75,25 +89,11 @@ class GeminiReasoningProvider(ReasoningProvider):
                 "linked_vuln_id": vuln_record.get("vuln_id"),
                 "verdict": "needs_review",
                 "confidence": 0.5,
-                "reasoning": "Gemini response could not be parsed; review required.",
+                "reasoning": "OpenAI response parse failed. Fallback to review.",
                 "secure_fix_guidance": vuln_record.get("fix_suggestion", ""),
-                "evidence_lines": [context.get("target_line", vuln_record.get("line_number", 1))],
+                "evidence_lines": [vuln_record.get("line_number", 1)],
                 "provider_name": self.name,
                 "model_name": self.model,
                 "attack_scenario": "",
                 "severity_override": "MEDIUM",
             }
-
-    def reason(self, vuln_record: dict, context: dict) -> dict:
-        self._throttle()
-        prompt = self._build_prompt(vuln_record, context)
-        request = types.GenerateTextRequest(
-            model=self.model,
-            prompt=prompt,
-            max_output_tokens=500,
-            temperature=0.2,
-        )
-        resp = self.client.generate_text(request)
-        self._last_called = time.time()
-        text = resp.text or ""
-        return self._parse_response(text, vuln_record, context)

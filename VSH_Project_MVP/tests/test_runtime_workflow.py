@@ -83,6 +83,8 @@ def test_l1_l2_l3_e2e(tmp_path: Path):
     file.write_text("print(eval(input()))\n", encoding="utf-8")
     payload = VshRuntimeEngine().analyze_file(str(file))
     assert "vuln_records" in payload and "l2_reasoning_results" in payload and "l3_validation_results" in payload
+    assert all(v.get("l3_validated") is not None for v in payload["vuln_records"])
+    assert all(v.get("l3_confidence") is not None for v in payload["vuln_records"])
 
 
 def test_cli_snapshot_shape(tmp_path: Path):
