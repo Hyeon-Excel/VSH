@@ -92,9 +92,46 @@ PYTHONPATH=. pytest -q tests/test_runtime_workflow.py tests/test_l1_integration_
 - 커밋: `Improve L3 validation integration ...` (현재까지)
 - 이후 작업: SBOM 확대, ABI/REACH 확률 모델, L3 POC 엔진, IDE 리포트 플러그인
 
-## 8. 한글/영문 문서
-- `ARCHITECTURE.md`
-- `LIMITATIONS.md`
-- `HANDOFF.md`
-- `docs/integration/ide_workflow.md`
+## 9. 새로운 확장 모듈
+
+### vsh_api (Python API 래퍼)
+- FastAPI 기반 HTTP API
+- 엔드포인트: /scan/file, /scan/project, /diagnostics, /watch/start, /watch/stop, /health
+- 실행: `cd vsh_api && uvicorn main:app --host 0.0.0.0 --port 3000`
+
+### vsh_desktop (데스크톱 앱)
+- Electron + React + TypeScript
+- 설치: `cd vsh_desktop && npm install`
+- 실행: `npm run electron-dev` (API 먼저 실행 필요)
+- 기능: 파일/프로젝트 선택, 스캔, 결과 테이블, 요약 카드
+
+### vsh_vscode (VS Code 확장)
+- TypeScript 기반 확장
+- 설치: `cd vsh_vscode && npm install && npm run compile`
+- 실행: VS Code에서 확장 로드 (F5)
+- 명령: "VSH: Analyze Current File", "VSH: Analyze Workspace"
+- 설정: vsh.apiUrl, vsh.watchOnSave
+
+### 사용법
+1. API 실행: `uvicorn vsh_api.main:app --host 0.0.0.0 --port 3000`
+2. 데스크톱: `cd vsh_desktop && npm run electron-dev`
+3. VS Code: 확장 설치 후 명령 실행
+
+### 파일 트리
+```
+VSH_Project_MVP/
+├── vsh_api/
+│   └── main.py
+├── vsh_desktop/
+│   ├── package.json
+│   ├── main.ts
+│   └── src/
+│       ├── App.tsx
+│       └── index.tsx
+└── vsh_vscode/
+    ├── package.json
+    ├── src/
+    │   └── extension.ts
+    └── tsconfig.json
+```
 
