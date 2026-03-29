@@ -146,9 +146,9 @@ function updateDiagnostics(findings: any[]) {
   for (const f of findings) {
     const uri = vscode.Uri.file(f.file);
     if (!diagnostics[f.file]) diagnostics[f.file] = [];
-    const severity = finding.severity === 'CRITICAL' ? vscode.DiagnosticSeverity.Error :
-                     finding.severity === 'HIGH' ? vscode.DiagnosticSeverity.Warning :
-                     finding.severity === 'MEDIUM' ? vscode.DiagnosticSeverity.Warning :
+    const severity = f.severity === 'CRITICAL' ? vscode.DiagnosticSeverity.Error :
+                     f.severity === 'HIGH' ? vscode.DiagnosticSeverity.Warning :
+                     f.severity === 'MEDIUM' ? vscode.DiagnosticSeverity.Warning :
                      vscode.DiagnosticSeverity.Information;
     const diagnostic = new vscode.Diagnostic(
       new vscode.Range(f.line - 1, 0, f.end_line - 1, 100),

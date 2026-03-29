@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Dashboard from './components/Dashboard';
 import FindingsTable from './components/FindingsTable';
 import DetailPanel from './components/DetailPanel';
 import CodePreview from './components/CodePreview';
+import SettingsPage from './components/SettingsPage';
+import SetupWizard from './components/SetupWizard';
 
 // API URL 설정화
 const getApiBase = () => {
@@ -50,6 +52,16 @@ function App() {
   const [error, setError] = useState('');
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [watchMode, setWatchMode] = useState(false);
+  const [view, setView] = useState<'scanner' | 'settings' | 'wizard'>('scanner');
+
+  useEffect(() => {
+    const complete = localStorage.getItem('vsh_setup_complete') === 'true';
+    if (!complete) {
+      setView('wizard');
+    } else {
+      setView('scanner');
+    }
+  }, []);
 
   const selectFile = async () => {
     const result = await (window as any).electronAPI.openFile();
@@ -85,7 +97,7 @@ function App() {
 
   const exportReport = () => {
     const dataStr = JSON.stringify({ findings, summary }, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
     const exportFileDefaultName = 'vsh-report.json';
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -93,8 +105,31 @@ function App() {
     linkElement.click();
   };
 
+  const onWizardComplete = async (wizardConfig: any) => {
+    try {
+      await axios.post(`${API_BASE}/settings`, wizardConfig);
+      localStorage.setItem('vsh_setup_complete', 'true');
+      setView('scanner');
+      setError('');
+    } catch (e: any) {
+      setError('Wizard save failed.');
+    }
+  };
+
+  if (view === 'wizard') {
+    return <SetupWizard apiBase={API_BASE} onComplete={onWizardComplete} />;
+  }
+
+  if (view === 'settings') {
+    return <SettingsPage apiBase={API_BASE} onBack={() => setView('scanner')} />;
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ position: 'absolute', top: 12, right: 20, zIndex: 10 }}>
+        <button onClick={() => setView('settings')} style={{ padding: '8px 12px', marginRight: 6 }}>⚙️ Settings</button>
+        <button onClick={() => setView('scanner')} style={{ padding: '8px 12px' }}>🔙 Scanner</button>
+      </div>
       <div style={{ flex: 1, padding: 20, backgroundColor: '#f5f5f5' }}>
         <h1 style={{ color: '#333', marginBottom: 20 }}>🛡️ VSH Security Scanner</h1>
         
@@ -250,7 +285,7 @@ function App() {
         {selectedFinding ? (
           <>
             <DetailPanel finding={selectedFinding} />
-            <CodePreview finding={selectedFinding} />
+            <CodePreview finding={selectedFinding} apiBase={API_BASE} />
           </>
         ) : (
           <div style={{ 

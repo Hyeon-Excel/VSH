@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from pathlib import Path
 import json
 import os
+import shutil
 from vsh_runtime.engine import VshRuntimeEngine
 from vsh_runtime.watcher import ProjectWatcher
 import threading
@@ -11,6 +12,63 @@ app = FastAPI(title="VSH API", version="1.0.0")
 
 engine = VshRuntimeEngine()
 watchers = {}  # path -> watcher instance
+
+CONFIG_DIR = Path.home() / '.vsh'
+CONFIG_PATH = CONFIG_DIR / 'config.json'
+
+DEFAULT_CONFIG = {
+    "llm": {
+        "provider": "mock",
+        "gemini_api_key": "",
+        "openai_api_key": "",
+        "model": "gemini-1.5-pro",
+        "enable_l2": True,
+        "enable_l3": True
+    },
+    "tools": {
+        "syft_enabled": True,
+        "syft_path": "",
+        "syft_auto_detect": True
+    },
+    "scan": {
+        "watch_on_save": True,
+        "auto_scan_on_select": False,
+        "enable_sbom": True,
+        "max_files_per_scan": 200,
+        "exclude_dirs": [
+            ".git",
+            "node_modules",
+            "venv",
+            "__pycache__",
+            "dist",
+            "build"
+        ],
+        "include_extensions": [
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx"
+        ]
+    },
+    "output": {
+        "export_path": "./exports",
+        "save_json": True,
+        "save_markdown": True,
+        "save_diagnostics": True,
+        "auto_open_report_after_scan": False
+    },
+    "ui": {
+        "theme": "dark",
+        "show_code_preview": True,
+        "show_attack_scenario": True,
+        "show_validation_panel": True
+    },
+    "system": {
+        "api_base_url": "http://localhost:3000",
+        "config_version": 1
+    }
+}
 
 class ScanRequest(BaseModel):
     path: str
@@ -43,6 +101,28 @@ def save_report(target_path: str, report: dict):
         with open(md_file, "w", encoding="utf-8") as f:
             f.write(report["previews"]["markdown"])
 
+
+def ensure_config_path():
+    CONFIG_DIR.mkdir(exist_ok=True, parents=True)
+    if not CONFIG_PATH.exists():
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(DEFAULT_CONFIG, f, ensure_ascii=False, indent=2)
+
+
+def load_config() -> dict:
+    ensure_config_path()
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return DEFAULT_CONFIG.copy()
+
+
+def save_config(config: dict):
+    ensure_config_path()
+    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
 @app.post("/scan/file")
 def scan_file(req: ScanRequest):
     if not Path(req.path).is_file():
@@ -72,6 +152,82 @@ def get_diagnostics(path: str):
         raise HTTPException(status_code=404, detail="Diagnostics not found")
     with open(diag_file, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+@app.get("/settings")
+def get_settings():
+    return load_config()
+
+
+@app.post("/settings")
+def post_settings(config: dict):
+    save_config(config)
+    return {"status": "ok", "settings": config}
+
+
+@app.post("/settings/test-llm")
+def test_llm(settings: dict):
+    provider = settings.get('provider', 'mock')
+    if provider == 'mock':
+        return {"provider": provider, "connected": True, "reason": "Mock provider always connected"}
+
+    if provider == 'gemini':
+        key = settings.get('gemini_api_key', '')
+    elif provider == 'openai':
+        key = settings.get('openai_api_key', '')
+    else:
+        return {"provider": provider, "connected": False, "reason": "Unknown provider"}
+
+    if not key:
+        return {"provider": provider, "connected": False, "reason": "API key not configured"}
+
+    # 실제 호출 여부는 환경 의존, 우선 키 존재만 검증
+    return {"provider": provider, "connected": True, "reason": "API key set"}
+
+
+@app.post("/settings/check-syft")
+def check_syft(settings: dict):
+    syft_path = settings.get('syft_path', '')
+    syft_installed = False
+    syft_found = ''
+
+    if syft_path:
+        if Path(syft_path).exists():
+            syft_installed = True
+            syft_found = syft_path
+    else:
+        what = shutil.which('syft')
+        if what:
+            syft_installed = True
+            syft_found = what
+
+    return {
+        "syft": {
+            "installed": syft_installed,
+            "path": syft_found
+        }
+    }
+
+
+@app.get("/system/status")
+def system_status():
+    config = load_config()
+    syft_info = check_syft({
+        'syft_path': config.get('tools', {}).get('syft_path', '')
+    })['syft']
+    llm = config.get('llm', {})
+
+    return {
+        "api_server": "running",
+        "python_core": "ready",
+        "syft": syft_info,
+        "llm": {
+            "provider": llm.get('provider', 'mock'),
+            "configured": bool((llm.get('gemini_api_key') or llm.get('openai_api_key'))),
+            "connected": llm.get('provider', 'mock') == 'mock' or bool(llm.get('gemini_api_key') or llm.get('openai_api_key'))
+        },
+        "config_path": str(CONFIG_PATH)
+    }
 
 @app.post("/watch/start")
 def watch_start(req: WatchRequest):

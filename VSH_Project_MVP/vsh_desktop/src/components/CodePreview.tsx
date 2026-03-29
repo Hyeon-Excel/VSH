@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'http://localhost:3000';
-
 interface Finding {
   file: string;
   line: number;
@@ -11,9 +9,10 @@ interface Finding {
 
 interface CodePreviewProps {
   finding: Finding;
+  apiBase: string;
 }
 
-function CodePreview({ finding }: CodePreviewProps) {
+function CodePreview({ finding, apiBase }: CodePreviewProps) {
   const [code, setCode] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,7 +23,7 @@ function CodePreview({ finding }: CodePreviewProps) {
       setError('');
       try {
         // API에서 파일 내용 가져오기
-        const res = await axios.get(`${API_BASE}/file/content`, { params: { path: finding.file } });
+        const res = await axios.get(`${apiBase}/file/content`, { params: { path: finding.file } });
         setCode(res.data.content);
       } catch (e) {
         setError('Failed to load file content. Please check if the file exists and try again.');

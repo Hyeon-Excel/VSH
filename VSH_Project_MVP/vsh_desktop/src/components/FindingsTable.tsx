@@ -4,9 +4,27 @@ interface Finding {
   id: string;
   file: string;
   line: number;
+  end_line: number;
   severity: string;
+  rule_id: string;
   message: string;
-  // ... other fields
+  evidence: string;
+  reachability_status: string;
+  reachability_confidence: number;
+  l2_reasoning: {
+    is_vulnerable: boolean;
+    confidence: number;
+    reasoning: string;
+    attack_scenario: string;
+    fix_suggestion: string;
+  };
+  l3_validation: {
+    validated: boolean;
+    exploit_possible: boolean;
+    confidence: number;
+    evidence: string;
+    recommended_fix: string;
+  };
 }
 
 interface FindingsTableProps {
