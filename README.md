@@ -141,7 +141,9 @@ VSH_Project_MVP/
 │   │       ├── Dashboard.tsx
 │   │       ├── FindingsTable.tsx
 │   │       ├── DetailPanel.tsx
-│   │       └── CodePreview.tsx
+│   │       ├── CodePreview.tsx
+│   │       ├── SettingsPage.tsx
+│   │       └── SetupWizard.tsx
 │   └── vite.config.ts
 ├── vsh_vscode/
 │   ├── package.json
@@ -150,4 +152,18 @@ VSH_Project_MVP/
 │       └── extension.ts
 └── .env
 ```
+
+## 10. Settings & Setup
+- `.vsh/config.json`에 설정 저장 (default 설정 포함)
+- `GET /settings`, `POST /settings` API로 설정 조회/저장
+- `POST /settings/test-llm` : LLM key 연결 확인
+- `POST /settings/check-syft` : Syft 설치/경로 확인
+- `GET /system/status` : API / Python / Syft / LLM 상태 반환
+- Desktop Settings UI: AI, Analysis Tools, Scan, Output, System 탭
+- Setup Wizard: 첫 실행에 순차 설정 (LLM provider, key, Syft, 기본 옵션)
+
+## 11. 환경 파일
+- `.env.example`에 VSH_API_URL, VITE_VSH_API_URL, VSH_WATCH_ON_SAVE 추가
+- `.env`에 로컬 환경설정 저장
+
 
