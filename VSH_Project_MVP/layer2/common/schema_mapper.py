@@ -50,7 +50,11 @@ def build_l2_vuln_records(
                 severity=(l1_record.severity if l1_record else _severity_from_finding(finding)),
                 cvss_score=l1_record.cvss_score if l1_record else _extract_cvss(suggestion.evidence_refs),
                 reachability_status=_normalize_reachability(finding),
-                reachability_confidence=_confidence_band(suggestion.metadata.l2.confidence_score),
+                reachability_confidence=(
+                    _normalize_reachability_confidence(finding)
+                    if l1_record is None
+                    else (l1_record.reachability_confidence or _normalize_reachability_confidence(finding))
+                ),
                 kisa_ref=suggestion.kisa_ref or (l1_record.kisa_ref if l1_record else "미매핑-추후보강"),
                 fss_ref=l1_record.fss_ref if l1_record else None,
                 owasp_ref=l1_record.owasp_ref if l1_record else None,
@@ -127,11 +131,23 @@ def _severity_from_finding(finding: Vulnerability | None) -> str:
 def _normalize_reachability(finding: Vulnerability | None) -> str:
     if finding is None:
         return "unknown"
-    if finding.reachability_status in {"YES", "reachable"}:
+    status = (finding.reachability_status or "").lower()
+    if status in {"yes", "reachable", "high"}:
         return "reachable"
-    if finding.reachability_status in {"NO", "unreachable"}:
+    if status in {"no", "unreachable", "low"}:
         return "unreachable"
     return "unknown"
+
+
+def _normalize_reachability_confidence(finding: Vulnerability | None) -> str:
+    if finding is None:
+        return "low"
+    confidence = finding.metadata.get("reachability_confidence") or "unknown"
+    if isinstance(confidence, str):
+        confidence = confidence.lower()
+        if confidence in {"high", "medium", "low"}:
+            return confidence
+    return "low"
 
 
 def _confidence_band(score: int) -> str:

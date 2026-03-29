@@ -135,8 +135,8 @@ def detect_typosquatting_findings(file_path: str) -> list[Vulnerability]:
             if score > best_score:
                 best_match, best_score, best_ev = candidate, score, ev
 
-        if best_match and best_score >= 0.82:
-            severity = "HIGH" if best_score >= 0.92 else "MEDIUM"
+        if best_match and best_score >= 0.72:
+            severity = "HIGH" if best_score >= 0.88 else "MEDIUM"
             findings.append(Vulnerability(
                 file_path=file_path,
                 rule_id="VSH-IMPORT-TYPOSQUATTING-001",

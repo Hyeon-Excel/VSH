@@ -12,15 +12,13 @@ def _dedup_key(finding: Vulnerability) -> tuple:
     evidence = (finding.code_snippet or "").strip()
     span_start = finding.line_number
     span_end = finding.metadata.get("end_line_number", finding.line_number)
+    # core dedup grouping: same file, CWE, line-span => merge duplicates
+    # metadata and evidence는 병합 시력으로 유지하며 false-merge는 _merge_findings에서 조정
     return (
         finding.file_path,
         finding.cwe_id,
-        finding.rule_id,
-        finding.metadata.get("engine"),
-        finding.metadata.get("vuln_type"),
         span_start,
         span_end,
-        evidence,
     )
 
 

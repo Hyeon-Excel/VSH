@@ -17,7 +17,16 @@ except ImportError:
     VULNERABLE_PACKAGES = {}
 
 LOGGER = get_logger(__name__)
-MANIFEST_FILES = ["requirements.txt", "pyproject.toml", "Pipfile", "poetry.lock", "package.json", "package-lock.json"]
+MANIFEST_FILES = [
+    "requirements.txt",
+    "pyproject.toml",
+    "Pipfile",
+    "poetry.lock",
+    "package.json",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+]
 REQ_RE = re.compile(r"^([a-zA-Z0-9_\-.@/]+)(?:[=!<>~]+([0-9a-zA-Z\-.+]+))?")
 
 
@@ -45,7 +54,12 @@ class SBOMScanner(BaseScanner):
                     severity="HIGH",
                     line_number=line_no,
                     code_snippet=raw_line,
-                    metadata={"ecosystem": self._infer_ecosystem(manifest.name), "package": package_name, "version": package_version},
+                    metadata={
+                        "ecosystem": self._infer_ecosystem(manifest.name),
+                        "package": package_name,
+                        "version": package_version,
+                        "sbom_source": manifest.name,
+                    },
                 ))
 
         return ScanResult(file_path=str(root), language="multi", findings=findings)
@@ -68,6 +82,36 @@ class SBOMScanner(BaseScanner):
 
     def _extract_packages(self, manifest: Path) -> Iterable[tuple[int, str, str | None, str]]:
         text = manifest.read_text(encoding="utf-8", errors="ignore")
+        if manifest.name == "package.json":
+            try:
+                import json
+                data = json.loads(text)
+                for section in ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]:
+                    deps = data.get(section, {}) or {}
+                    for pkg, ver in deps.items():
+                        yielding_line = f"{pkg}@{ver} ({section})"
+                        yield 0, pkg, str(ver), yielding_line
+                return
+            except Exception:
+                pass
+
+        if manifest.name in {"package-lock.json", "yarn.lock", "pnpm-lock.yaml"}:
+            for idx, line in enumerate(text.splitlines(), start=1):
+                # simple lock file parsing fallback
+                if "@" in line and line.strip().startswith("\""):
+                    parts = line.strip().strip('"').split("@", 1)
+                    if len(parts) == 2:
+                        pkg = parts[0]
+                        version = parts[1].split(":")[0].strip()
+                        if pkg and version:
+                            yield idx, pkg, version, line.strip()
+                if "version" in line and ":" in line and "\"" in line:
+                    m = re.search(r"[\"']([0-9a-zA-Z_\-.]+)[\"']", line)
+                    if m:
+                        version = m.group(1)
+                        # package name may be implied by prior key, ignore for now
+            # continue with requirement-file fallback
+
         for idx, line in enumerate(text.splitlines(), start=1):
             stripped = line.strip().strip(',')
             if not stripped or stripped.startswith("#"):

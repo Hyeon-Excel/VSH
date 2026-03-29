@@ -16,6 +16,13 @@ def test_vsh_l1_scanner_detects_pattern_and_typosquatting(tmp_path):
         ),
         encoding="utf-8",
     )
+    (tmp_path / "requirements.txt").write_text("requests==2.0.0\n", encoding="utf-8")
+
+    try:
+        import config
+        config.VULNERABLE_PACKAGES["requests"] = {"vulnerable_below": "2.26.0", "cve": "CVE-9999"}
+    except Exception:
+        pass
 
     scanner = VSHL1Scanner()
     result = scanner.scan(str(sample))
@@ -32,7 +39,7 @@ def test_vsh_l1_scanner_detects_pattern_and_typosquatting(tmp_path):
     assert len(result.vuln_records) >= 2
     assert result.vuln_records[0].source == "L1"
     assert result.vuln_records[0].kisa_ref
-    assert result.vuln_records[0].reachability_status == "unknown"
+    assert result.vuln_records[0].reachability_status == "reachable"
     assert result.vuln_records[0].fix_suggestion
     assert result.package_records
     assert all(record.source == "L1" for record in result.package_records)
@@ -85,6 +92,12 @@ def test_integrated_pipeline_exposes_l1_normalized_outputs(monkeypatch, tmp_path
         ),
         encoding="utf-8",
     )
+    (tmp_path / "requirements.txt").write_text("requests==2.0.0\n", encoding="utf-8")
+    try:
+        import config
+        config.VULNERABLE_PACKAGES["requests"] = {"vulnerable_below": "2.26.0", "cve": "CVE-9999"}
+    except Exception:
+        pass
 
     pipeline = PipelineFactory.create()
     scan_only_result = pipeline.run_scan_only(str(sample))
@@ -97,7 +110,7 @@ def test_integrated_pipeline_exposes_l1_normalized_outputs(monkeypatch, tmp_path
     assert run_result["package_records"]
     assert run_result["l2_vuln_records"]
     assert run_result["vuln_records"][0]["kisa_ref"]
-    assert run_result["vuln_records"][0]["reachability_status"] == "unknown"
+    assert run_result["vuln_records"][0]["reachability_status"] == "reachable"
     assert "fix_suggestion" in run_result["vuln_records"][0]
     assert run_result["l2_vuln_records"][0]["source"] == "L2"
     assert run_result["l2_vuln_records"][0]["vuln_id"]
@@ -149,3 +162,42 @@ def test_deduplicate_findings_merges_metadata_without_losing_signal():
     assert finding.metadata["scanner"] == "pattern"
     assert finding.metadata["source"] == "tree-sitter"
     assert finding.code_snippet == "cursor.execute(query % user_input)"
+
+
+def test_sbom_scanner_is_target_aware(tmp_path):
+    # project structure with package.json and requirements
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "package.json").write_text('{"dependencies": {"express": "4.17.1", "lodash": "4.17.21"}}', encoding="utf-8")
+    (project / "requirements.txt").write_text("requests==2.25.1\n", encoding="utf-8")
+
+    # vulnerable package configured in config.py optionally; fallback by dynamic injection
+    try:
+        from config import VULNERABLE_PACKAGES
+        VULNERABLE_PACKAGES["requests"] = {"vulnerable_below": "2.26.0", "cve": "CVE-XXXX"}
+    except ImportError:
+        pass
+
+    from layer1.scanner.sbom_scanner import SBOMScanner
+
+    scanner = SBOMScanner()
+    result = scanner.scan(str(project))
+
+    assert result.file_path == str(project)
+    assert any(f.cwe_id == "CWE-829" for f in result.findings)
+    assert any("requests" in f.metadata.get("package", "") for f in result.findings)
+    assert any(f.metadata.get("sbom_source") in {"package.json", "requirements.txt"} for f in result.findings)
+
+
+def test_mixed_language_detection_project(tmp_path):
+    folder = tmp_path / "ml"
+    folder.mkdir()
+    (folder / "app.py").write_text("print(\"Hello\")\n", encoding="utf-8")
+    (folder / "app.js").write_text("console.log('hi')\n", encoding="utf-8")
+
+    from layer1.common.import_risk import detect_project_languages
+    langs = detect_project_languages(str(folder))
+
+    assert "python" in langs
+    assert "javascript" in langs
+
