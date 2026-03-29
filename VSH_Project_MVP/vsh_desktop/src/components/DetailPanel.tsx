@@ -34,10 +34,10 @@ interface DetailPanelProps {
 function DetailPanel({ finding }: DetailPanelProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'CRITICAL': return '#ff4444';
-      case 'HIGH': return '#ff8800';
-      case 'MEDIUM': return '#ffaa00';
-      default: return '#888888';
+      case 'CRITICAL': return '#dc3545'; // 더 진한 빨강
+      case 'HIGH': return '#fd7e14'; // 주황
+      case 'MEDIUM': return '#ffc107'; // 노랑
+      default: return '#6c757d'; // 회색
     }
   };
 

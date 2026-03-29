@@ -38,11 +38,33 @@ function CodePreview({ finding }: CodePreviewProps) {
     return lineNum >= finding.line && lineNum <= finding.end_line;
   };
 
+  const retryFetch = () => {
+    fetchCode();
+  };
+
   return (
     <div style={{ marginTop: 20, fontFamily: 'Monaco, Consolas, monospace' }}>
       <h2>📄 Code Preview - {finding.file}</h2>
       {loading && <p>🔄 Loading code...</p>}
-      {error && <p style={{ color: 'orange' }}>⚠️ {error}</p>}
+      {error && (
+        <div style={{ color: 'red', marginBottom: 10 }}>
+          ❌ {error}
+          <button 
+            onClick={retryFetch}
+            style={{ 
+              marginLeft: 10, 
+              padding: '5px 10px', 
+              backgroundColor: '#2196F3', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: 4, 
+              cursor: 'pointer' 
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <pre style={{
         backgroundColor: '#2d3748',
         color: '#e2e8f0',

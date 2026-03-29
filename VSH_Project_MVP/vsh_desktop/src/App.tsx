@@ -229,14 +229,16 @@ function App() {
           
           {watchMode && (
             <div style={{ 
-              padding: 10, 
+              padding: 15, 
               backgroundColor: '#e8f5e8', 
-              border: '1px solid #4CAF50', 
-              borderRadius: 4, 
+              border: '2px solid #4CAF50', 
+              borderRadius: 8, 
               color: '#2e7d32',
-              marginTop: 10
+              marginTop: 10,
+              animation: 'pulse 2s infinite'
             }}>
-              👀 <strong>Watch Mode Active:</strong> Monitoring {path} for changes...
+              👀 <strong>Watch Mode Active:</strong> Monitoring {path} for changes...<br/>
+              <small>Try editing a Python file to see automatic analysis!</small>
             </div>
           )}
         </div>

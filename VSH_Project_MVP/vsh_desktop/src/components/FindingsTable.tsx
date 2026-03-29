@@ -34,10 +34,14 @@ function FindingsTable({ findings, onSelect }: FindingsTableProps) {
               <td style={{ border: '1px solid #ccc', padding: 5 }}>{f.line}</td>
               <td style={{ border: '1px solid #ccc', padding: 5 }}>
                 <span style={{
-                  backgroundColor: f.severity === 'CRITICAL' ? 'red' : f.severity === 'HIGH' ? 'orange' : 'yellow',
+                  backgroundColor: f.severity === 'CRITICAL' ? '#dc3545' : 
+                                   f.severity === 'HIGH' ? '#fd7e14' : 
+                                   f.severity === 'MEDIUM' ? '#ffc107' : '#6c757d',
                   color: 'white',
-                  padding: '2px 5px',
-                  borderRadius: 3
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  fontWeight: 'bold',
+                  fontSize: '12px'
                 }}>
                   {f.severity}
                 </span>
