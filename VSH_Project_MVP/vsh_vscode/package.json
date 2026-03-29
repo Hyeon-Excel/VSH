@@ -18,6 +18,10 @@
       {
         "command": "vsh.analyzeWorkspace",
         "title": "VSH: Analyze Workspace"
+      },
+      {
+        "command": "vsh.showDetails",
+        "title": "VSH: Show Finding Details"
       }
     ],
     "configuration": {

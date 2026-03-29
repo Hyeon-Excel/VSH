@@ -96,26 +96,34 @@ PYTHONPATH=. pytest -q tests/test_runtime_workflow.py tests/test_l1_integration_
 
 ### vsh_api (Python API 래퍼)
 - FastAPI 기반 HTTP API
-- 엔드포인트: /scan/file, /scan/project, /diagnostics, /watch/start, /watch/stop, /health
-- 실행: `cd vsh_api && uvicorn main:app --host 0.0.0.0 --port 3000`
+- 엔드포인트: `/scan/file`, `/scan/project`, `/diagnostics`, `/watch/start`, `/watch/stop`, `/health`
+- 저장 경로: 파일 분석 시 `file.parent/.vsh`, 프로젝트 시 `project_root/.vsh`
+- 실행: `cd VSH_Project_MVP/vsh_api && uvicorn main:app --host 0.0.0.0 --port 3000`
 
 ### vsh_desktop (데스크톱 앱)
 - Electron + React + TypeScript
-- 설치: `cd vsh_desktop && npm install`
-- 실행: `npm run electron-dev` (API 먼저 실행 필요)
-- 기능: 파일/프로젝트 선택, 스캔, 결과 테이블, 요약 카드
+- 기능: 파일/폴더 선택, 스캔, 대시보드, findings 테이블, 상세 패널, 코드 프리뷰, watch mode, export JSON
+- UI: 로딩 스피너, 에러 메시지, severity badge, 카드 레이아웃
+- 설치: `cd VSH_Project_MVP/vsh_desktop && npm install`
+- 실행: `npm run electron-dev` (API 먼저 실행)
+- 빌드: `npm run build`
 
 ### vsh_vscode (VS Code 확장)
 - TypeScript 기반 확장
-- 설치: `cd vsh_vscode && npm install && npm run compile`
-- 실행: VS Code에서 확장 로드 (F5)
-- 명령: "VSH: Analyze Current File", "VSH: Analyze Workspace"
+- 명령: "VSH: Analyze Current File", "VSH: Analyze Workspace", "VSH: Show Finding Details"
+- 기능: Problems 패널 diagnostics, Hover (reasoning/fix), Code Action (Quick Fix), Webview 상세 패널
 - 설정: vsh.apiUrl, vsh.watchOnSave
+- 설치: `cd VSH_Project_MVP/vsh_vscode && npm install && npm run compile`
+- 실행: VS Code에서 F5 디버그
 
 ### 사용법
-1. API 실행: `uvicorn vsh_api.main:app --host 0.0.0.0 --port 3000`
-2. 데스크톱: `cd vsh_desktop && npm run electron-dev`
-3. VS Code: 확장 설치 후 명령 실행
+1. API 실행: `uvicorn VSH_Project_MVP.vsh_api.main:app --host 0.0.0.0 --port 3000`
+2. 데스크톱: `cd VSH_Project_MVP/vsh_desktop && npm run electron-dev`
+3. VS Code: 확장 설치 후 명령 실행, hover/code action 사용
+
+### 시연 시나리오
+- 데스크톱 앱 실행 → 파일 선택 → 스캔 → findings 확인 → 상세 패널 → 코드 프리뷰 → export
+- VS Code에서 파일 열기 → "VSH: Analyze Current File" → Problems 패널 확인 → hover → Quick Fix → Webview 상세
 
 ### 파일 트리
 ```
@@ -125,13 +133,21 @@ VSH_Project_MVP/
 ├── vsh_desktop/
 │   ├── package.json
 │   ├── main.ts
+│   ├── preload.ts
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── index.tsx
+│   │   └── components/
+│   │       ├── Dashboard.tsx
+│   │       ├── FindingsTable.tsx
+│   │       ├── DetailPanel.tsx
+│   │       └── CodePreview.tsx
+│   └── vite.config.ts
+├── vsh_vscode/
+│   ├── package.json
+│   ├── tsconfig.json
 │   └── src/
-│       ├── App.tsx
-│       └── index.tsx
-└── vsh_vscode/
-    ├── package.json
-    ├── src/
-    │   └── extension.ts
-    └── tsconfig.json
+│       └── extension.ts
+└── .env
 ```
 

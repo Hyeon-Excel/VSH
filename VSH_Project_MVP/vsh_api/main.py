@@ -19,14 +19,20 @@ class WatchRequest(BaseModel):
     path: str
 
 def save_diagnostics(target_path: str, diagnostics: dict):
-    vsh_dir = Path(target_path).parent / ".vsh"
+    if Path(target_path).is_file():
+        vsh_dir = Path(target_path).parent / ".vsh"
+    else:
+        vsh_dir = Path(target_path) / ".vsh"
     vsh_dir.mkdir(exist_ok=True)
     diag_file = vsh_dir / "diagnostics.json"
     with open(diag_file, "w", encoding="utf-8") as f:
         json.dump(diagnostics, f, ensure_ascii=False, indent=2)
 
 def save_report(target_path: str, report: dict):
-    vsh_dir = Path(target_path).parent / ".vsh"
+    if Path(target_path).is_file():
+        vsh_dir = Path(target_path).parent / ".vsh"
+    else:
+        vsh_dir = Path(target_path) / ".vsh"
     vsh_dir.mkdir(exist_ok=True)
     json_file = vsh_dir / "report.json"
     md_file = vsh_dir / "report.md"
@@ -126,6 +132,11 @@ def normalize_response(result: dict, mode: str, target: str) -> dict:
         findings.append(finding)
     
     summary = result.get("aggregate_summary", {})
+    top_risky_files = sorted(
+        [(f, len([v for v in result.get("vuln_records", []) if v.get("file_path") == f])) for f in set(v.get("file_path") for v in result.get("vuln_records", []))],
+        key=lambda x: x[1], reverse=True
+    )[:5]
+    
     return {
         "target": target,
         "mode": mode,
@@ -136,6 +147,6 @@ def normalize_response(result: dict, mode: str, target: str) -> dict:
             "high": summary.get("risk_distribution", {}).get("P2", 0),
             "medium": summary.get("risk_distribution", {}).get("P3", 0),
             "low": summary.get("risk_distribution", {}).get("P4", 0) + summary.get("risk_distribution", {}).get("INFO", 0),
-            "top_risky_files": []  # TODO: implement
+            "top_risky_files": top_risky_files
         }
     }
