@@ -1,24 +1,31 @@
-# VSH
+# VSH Security Prototype (rasasoe-integration)
 
-현재 작업 기준 프로젝트는 [`VSH_Project_MVP`](/Users/hyeonexcel/Documents/Workspace/VSH/VSH_Project_MVP) 입니다.
+## 역할 분리 (핵심)
+- **L1 fast path**: pattern/heuristic/typosquatting/SBOM + lightweight reachability + 빠른 normalize.
+- **L2 context-aware reasoning**: finding-driven context extraction 후 "실제 취약 가능성" verdict 생성.
+- **L3 deep validation**: PoC/long-running/offline validation/report cold path.
 
-## 문서 위치
+## 실제 사용 가능 기능
+- CLI
+  - `python VSH_Project_MVP/scripts/vsh_cli.py scan-file <file> --format json|markdown|summary`
+  - `python VSH_Project_MVP/scripts/vsh_cli.py scan-project <dir> --format json|markdown|summary`
+  - `python VSH_Project_MVP/scripts/vsh_cli.py diagnostics <file_or_dir>`
+  - `python VSH_Project_MVP/scripts/vsh_cli.py watch <dir>`
+- Watcher
+  - `python VSH_Project_MVP/scripts/watch_and_scan.py --path ./target_project`
+- MCP tools
+  - `analyze_file`, `analyze_project`, `get_diagnostics`, `watch_project`
 
-- 설계/진행/조율 문서: [`docs/`](/Users/hyeonexcel/Documents/Workspace/VSH/docs)
-- 구현 기준 문서: [`VSH_Project_MVP/`](/Users/hyeonexcel/Documents/Workspace/VSH/VSH_Project_MVP)
-- 구현 세부 문서: [`VSH_Project_MVP/docs/`](/Users/hyeonexcel/Documents/Workspace/VSH/VSH_Project_MVP/docs)
+## 출력물
+- JSON: vuln_records/package_records/l2_reasoning_results/l3_validation_results/diagnostics/aggregate_summary
+- Markdown preview + inline preview + diagnostics JSON preview (non-destructive 기본)
 
-## 빠른 이동
+## 모드 구분
+- Default: mock/offline-safe (OSV/registry/reasoning)
+- Online: provider opt-in 확장 포인트
 
-- L1-L2 통합 진행 현황: [`docs/L1_L2_INTEGRATION_PROGRESS.md`](/Users/hyeonexcel/Documents/Workspace/VSH/docs/L1_L2_INTEGRATION_PROGRESS.md)
-- L1-L2 스키마 조율 메모: [`docs/L1_L2_SCHEMA_COORDINATION.md`](/Users/hyeonexcel/Documents/Workspace/VSH/docs/L1_L2_SCHEMA_COORDINATION.md)
-- L2 설계 문서: [`docs/L2-Architecture/README.md`](/Users/hyeonexcel/Documents/Workspace/VSH/docs/L2-Architecture/README.md)
-- 구현 아키텍처: [`VSH_Project_MVP/ARCHITECTURE.md`](/Users/hyeonexcel/Documents/Workspace/VSH/VSH_Project_MVP/ARCHITECTURE.md)
-- 구현 흐름: [`VSH_Project_MVP/docs/FLOW.md`](/Users/hyeonexcel/Documents/Workspace/VSH/VSH_Project_MVP/docs/FLOW.md)
-- 구현 API 계약: [`VSH_Project_MVP/docs/API_REFERENCE.md`](/Users/hyeonexcel/Documents/Workspace/VSH/VSH_Project_MVP/docs/API_REFERENCE.md)
-
-## 현재 상태 요약
-
-- 기준 브랜치에서 L2 확장은 완료되었고, 현재는 L1-L2 통합과 공통 스키마 정렬을 진행 중입니다.
-- 최신 통합 작업 브랜치는 `codex/l1-l2-integration` 입니다.
-- 최근 확인 기준 테스트 결과는 `41 passed, 1 skipped` 입니다.
+## 문서
+- `ARCHITECTURE.md`
+- `docs/integration/ide_workflow.md`
+- `LIMITATIONS.md`
+- `HANDOFF.md`
