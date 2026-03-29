@@ -63,7 +63,10 @@ def scan_project(req: ScanRequest):
 
 @app.get("/diagnostics")
 def get_diagnostics(path: str):
-    vsh_dir = Path(path).parent / ".vsh"
+    if Path(path).is_file():
+        vsh_dir = Path(path).parent / ".vsh"
+    else:
+        vsh_dir = Path(path) / ".vsh"
     diag_file = vsh_dir / "diagnostics.json"
     if not diag_file.exists():
         raise HTTPException(status_code=404, detail="Diagnostics not found")

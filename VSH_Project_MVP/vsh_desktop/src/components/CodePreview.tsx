@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'http://localhost:3000';
+
 interface Finding {
   file: string;
   line: number;
@@ -21,13 +23,11 @@ function CodePreview({ finding }: CodePreviewProps) {
       setLoading(true);
       setError('');
       try {
-        // API에서 파일 내용 가져오기 (가정)
-        const res = await axios.get(`http://localhost:3000/file/content`, { params: { path: finding.file } });
+        // API에서 파일 내용 가져오기
+        const res = await axios.get(`${API_BASE}/file/content`, { params: { path: finding.file } });
         setCode(res.data.content);
       } catch (e) {
-        // Fallback: mock code
-        setCode(`# Example code from ${finding.file}\nprint("hello world")\n# Line ${finding.line}: vulnerable code here\nimport os\nos.system("rm -rf /")\n# End of example`);
-        setError('Failed to load file content, showing example');
+        setError('Failed to load file content. Please check if the file exists and try again.');
       }
       setLoading(false);
     };

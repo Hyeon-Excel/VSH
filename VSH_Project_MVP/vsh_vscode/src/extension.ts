@@ -83,11 +83,12 @@ export function activate(context: vscode.ExtensionContext) {
           };
           actions.push(showDetailsAction);
           
-          // Quick Fix action if fix suggestion exists
+          // Quick Fix action - insert as comment instead of replace
           if (finding?.l2_reasoning?.fix_suggestion) {
-            const fixAction = new vscode.CodeAction('🔧 Apply VSH Fix', vscode.CodeActionKind.QuickFix);
+            const fixAction = new vscode.CodeAction('💡 Insert Fix Suggestion as Comment', vscode.CodeActionKind.QuickFix);
+            const commentText = `# VSH Fix Suggestion:\n# ${finding.l2_reasoning.fix_suggestion.replace(/\n/g, '\n# ')}\n`;
             fixAction.edit = new vscode.WorkspaceEdit();
-            fixAction.edit.replace(document.uri, diag.range, finding.l2_reasoning.fix_suggestion);
+            fixAction.edit.insert(document.uri, new vscode.Position(diag.range.end.line + 1, 0), commentText);
             fixAction.diagnostics = [diag];
             actions.push(fixAction);
           }
@@ -145,8 +146,9 @@ function updateDiagnostics(findings: any[]) {
   for (const f of findings) {
     const uri = vscode.Uri.file(f.file);
     if (!diagnostics[f.file]) diagnostics[f.file] = [];
-    const severity = f.severity === 'CRITICAL' ? vscode.DiagnosticSeverity.Error :
-                     f.severity === 'HIGH' ? vscode.DiagnosticSeverity.Warning :
+    const severity = finding.severity === 'CRITICAL' ? vscode.DiagnosticSeverity.Error :
+                     finding.severity === 'HIGH' ? vscode.DiagnosticSeverity.Warning :
+                     finding.severity === 'MEDIUM' ? vscode.DiagnosticSeverity.Warning :
                      vscode.DiagnosticSeverity.Information;
     const diagnostic = new vscode.Diagnostic(
       new vscode.Range(f.line - 1, 0, f.end_line - 1, 100),
@@ -166,6 +168,8 @@ function updateDiagnostics(findings: any[]) {
 function showWebviewPanel(finding: any) {
   if (currentPanel) {
     currentPanel.reveal(vscode.ViewColumn.One);
+    // Update content with new finding
+    currentPanel.webview.html = getWebviewContent(finding);
   } else {
     currentPanel = vscode.window.createWebviewPanel(
       'vshDetails',

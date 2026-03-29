@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { ipcRenderer } from 'electron';
 import Dashboard from './components/Dashboard';
 import FindingsTable from './components/FindingsTable';
 import DetailPanel from './components/DetailPanel';
 import CodePreview from './components/CodePreview';
 
-const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'http://localhost:3000'; // TODO: config
+// API URL 설정화
+const getApiBase = () => {
+  if (process.env.NODE_ENV === 'development') {
+    return process.env.VITE_VSH_API_URL || 'http://localhost:3000';
+  }
+  return process.env.VITE_VSH_API_URL || 'http://localhost:3000';
+};
+
+const API_BASE = getApiBase();
 
 interface Finding {
   id: string;
@@ -45,12 +52,12 @@ function App() {
   const [watchMode, setWatchMode] = useState(false);
 
   const selectFile = async () => {
-    const result = await ipcRenderer.invoke('dialog:openFile');
+    const result = await (window as any).electronAPI.openFile();
     if (result) setPath(result);
   };
 
   const selectFolder = async () => {
-    const result = await ipcRenderer.invoke('dialog:openDirectory');
+    const result = await (window as any).electronAPI.openDirectory();
     if (result) setPath(result);
   };
 
