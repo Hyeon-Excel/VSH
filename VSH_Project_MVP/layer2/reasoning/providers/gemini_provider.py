@@ -26,9 +26,9 @@ class GeminiReasoningProvider(ReasoningProvider):
         if Client is None or types is None:
             raise ImportError("google-genai package required for GeminiReasoningProvider: pip install google-genai")
 
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            raise EnvironmentError("GEMINI_API_KEY is required for GeminiReasoningProvider")
+            raise EnvironmentError("GOOGLE_API_KEY (or GEMINI_API_KEY) is required for GeminiReasoningProvider")
         self.client = Client(api_key=api_key)
 
     def _throttle(self):

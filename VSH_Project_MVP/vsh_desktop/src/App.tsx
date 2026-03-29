@@ -53,6 +53,8 @@ function App() {
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [watchMode, setWatchMode] = useState(false);
   const [view, setView] = useState<'scanner' | 'settings' | 'wizard'>('scanner');
+  const [apiOnline, setApiOnline] = useState(true);
+  const [apiStatusMessage, setApiStatusMessage] = useState('');
 
   useEffect(() => {
     const complete = localStorage.getItem('vsh_setup_complete') === 'true';
@@ -61,6 +63,29 @@ function App() {
     } else {
       setView('scanner');
     }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkApi = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/health`, { timeout: 1500 });
+        if (!mounted) return;
+        setApiOnline(res.status === 200);
+        setApiStatusMessage('');
+      } catch (e) {
+        if (!mounted) return;
+        setApiOnline(false);
+        setApiStatusMessage('API 서버에 연결할 수 없습니다. run_vsh.bat 또는 setup_and_run.ps1로 API를 먼저 실행하세요.');
+      }
+    };
+
+    checkApi();
+    const timer = window.setInterval(checkApi, 5000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   const selectFile = async () => {
@@ -133,6 +158,12 @@ function App() {
       <div style={{ flex: 1, padding: 20, backgroundColor: '#f5f5f5' }}>
         <h1 style={{ color: '#333', marginBottom: 20 }}>🛡️ VSH Security Scanner</h1>
         
+        {!apiOnline && (
+          <div style={{ marginBottom: 20, padding: 12, backgroundColor: '#fff7ed', border: '1px solid #fb923c', borderRadius: 8, color: '#9a3412' }}>
+            ⚠️ <strong>API Offline:</strong> {apiStatusMessage}
+          </div>
+        )}
+
         <div style={{ marginBottom: 20, padding: 15, backgroundColor: 'white', borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
           <h3>📂 Select Target</h3>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
@@ -175,7 +206,7 @@ function App() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
             <button 
               onClick={() => scan('file')} 
-              disabled={loading || !path}
+              disabled={loading || !path || !apiOnline}
               style={{ 
                 padding: '10px 20px', 
                 backgroundColor: (loading || !path) ? '#ccc' : '#4CAF50', 
@@ -190,7 +221,7 @@ function App() {
             </button>
             <button 
               onClick={() => scan('project')} 
-              disabled={loading || !path}
+              disabled={loading || !path || !apiOnline}
               style={{ 
                 padding: '10px 20px', 
                 backgroundColor: (loading || !path) ? '#ccc' : '#4CAF50', 
@@ -205,7 +236,7 @@ function App() {
             </button>
             <button 
               onClick={toggleWatch} 
-              disabled={!path}
+              disabled={!path || !apiOnline}
               style={{ 
                 padding: '10px 20px', 
                 backgroundColor: !path ? '#ccc' : (watchMode ? '#ff9800' : '#2196F3'), 
