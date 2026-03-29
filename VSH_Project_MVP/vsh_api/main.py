@@ -7,6 +7,9 @@ import shutil
 from vsh_runtime.engine import VshRuntimeEngine
 from vsh_runtime.watcher import ProjectWatcher
 import threading
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title="VSH API", version="1.0.0")
 
@@ -172,7 +175,7 @@ def test_llm(settings: dict):
         return {"provider": provider, "connected": True, "reason": "Mock provider always connected"}
 
     if provider == 'gemini':
-        key = settings.get('gemini_api_key', '')
+        key = settings.get('gemini_api_key', '') or os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY', '')
     elif provider == 'openai':
         key = settings.get('openai_api_key', '')
     else:
@@ -223,8 +226,8 @@ def system_status():
         "syft": syft_info,
         "llm": {
             "provider": llm.get('provider', 'mock'),
-            "configured": bool((llm.get('gemini_api_key') or llm.get('openai_api_key'))),
-            "connected": llm.get('provider', 'mock') == 'mock' or bool(llm.get('gemini_api_key') or llm.get('openai_api_key'))
+            "configured": bool((llm.get('gemini_api_key') or llm.get('openai_api_key') or os.environ.get('GOOGLE_API_KEY'))),
+            "connected": llm.get('provider', 'mock') == 'mock' or bool(llm.get('gemini_api_key') or llm.get('openai_api_key') or os.environ.get('GOOGLE_API_KEY'))
         },
         "config_path": str(CONFIG_PATH)
     }

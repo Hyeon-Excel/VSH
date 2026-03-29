@@ -1,21 +1,19 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import * as path from 'path';
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
 
-let mainWindow: BrowserWindow;
-let apiProcess: ChildProcessWithoutNullStreams | null = null;
+let mainWindow;
+let apiProcess = null;
 
 const isDev = !app.isPackaged;
 const shouldAutoStartApi = (process.env.VSH_AUTO_START_API || 'false').toLowerCase() === 'true';
 
-function resolveProjectRoot(): string {
+function resolveProjectRoot() {
   return path.resolve(__dirname, '..');
 }
 
 function startApiServer() {
-  if (!shouldAutoStartApi || apiProcess) {
-    return;
-  }
+  if (!shouldAutoStartApi || apiProcess) return;
 
   const projectRoot = resolveProjectRoot();
   const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
@@ -33,14 +31,8 @@ function startApiServer() {
     return;
   }
 
-  apiProcess.stdout.on('data', (data) => {
-    console.log(`[VSH API] ${data.toString().trim()}`);
-  });
-
-  apiProcess.stderr.on('data', (data) => {
-    console.error(`[VSH API] ${data.toString().trim()}`);
-  });
-
+  apiProcess.stdout.on('data', (data) => console.log(`[VSH API] ${data.toString().trim()}`));
+  apiProcess.stderr.on('data', (data) => console.error(`[VSH API] ${data.toString().trim()}`));
   apiProcess.on('exit', (code) => {
     console.log(`[VSH API] process exited with code ${code}`);
     apiProcess = null;
@@ -48,16 +40,12 @@ function startApiServer() {
 }
 
 function stopApiServer() {
-  if (!apiProcess) {
-    return;
-  }
-
+  if (!apiProcess) return;
   if (process.platform === 'win32') {
     spawn('taskkill', ['/pid', String(apiProcess.pid), '/f', '/t']);
   } else {
     apiProcess.kill('SIGTERM');
   }
-
   apiProcess = null;
 }
 
@@ -79,7 +67,7 @@ function createWindow() {
   }
 
   mainWindow.on('closed', () => {
-    mainWindow = null!;
+    mainWindow = null;
   });
 }
 
@@ -108,18 +96,10 @@ app.on('ready', () => {
   createWindow();
 });
 
-app.on('before-quit', () => {
-  stopApiServer();
-});
-
+app.on('before-quit', stopApiServer);
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
-
 app.on('activate', () => {
-  if (mainWindow === null) {
-    createWindow();
-  }
+  if (mainWindow === null) createWindow();
 });

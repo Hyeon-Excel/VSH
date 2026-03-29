@@ -1,169 +1,153 @@
-# VSH (Vulnerability Scanning and Heuristic) Security Platform
+# VSH (Vibe Secure Hook)
 
-> 🚀 이 프로젝트는 L1/L2/L3 역할 분리를 갖춘 보안 취약점 탐지 및 검증 PoC입니다.
+Windows에서 **zip 압축 해제 후 바로 시연**할 수 있도록 실행 구조를 정리한 가이드입니다.
 
-## 1. 개요
+---
 
-VSH는 Python 코드 및 패키지를 대상으로 한 계층형 취약점 평가 엔진입니다.
-- **L1 (빠른 탐지)**: 규칙/정적 패턴/typosquatting/SBOM + reachability + 취약점 normalize
-- **L2 (LLM Reasoning)**: 취약점 주변 코드 컨텍스트에서 위험성 판단, `likely_vulnerable/suspicious/not_vulnerable` 판단
-- **L3 (확증/검증)**: 심층 static path 분석 + retry/poc 생성 + cold path 검증
+## 0) 권장 설치 위치 (중요)
 
-프로덕션 목표
-- 낮은 FP (오탐) + 높은 대응 우선순위
-- 대규모 OTA 스캔에耐하는 아키텍처 (모듈/파이프라인 분리)
-- IDE/CLI/자동화 파이프라인 연계
+- ✅ 권장: `C:\VSH` 같은 **OneDrive 바깥 경로**
+- ⚠️ 비권장: `C:\Users\...\OneDrive\...`
 
-## 2. 주요 기능
+이유: OneDrive 동기화 경로에서는 `npm install`/Electron 설치 시 `EBUSY`, `EPERM`이 자주 발생합니다.
 
-### CLI
-- `python VSH_Project_MVP/scripts/vsh_cli.py scan-file <file> --format json|markdown|summary`
-- `python VSH_Project_MVP/scripts/vsh_cli.py scan-project <dir> --format json|markdown|summary`
-- `python VSH_Project_MVP/scripts/vsh_cli.py diagnostics <file_or_dir>`
-- `python VSH_Project_MVP/scripts/vsh_cli.py watch <dir>`
+---
 
-### Watcher (Live)
-- `python VSH_Project_MVP/scripts/watch_and_scan.py --path ./target_project`
+## 1) 사전 설치 요구사항
 
-### API / MCP
-- `VshRuntimeEngine().analyze_file(path)`
-- `VshRuntimeEngine().analyze_project(path)`
-- `VshRuntimeEngine().get_diagnostics(path)`
+- Python 3.12+
+- Node.js 20+
+- npm (Node 설치 시 포함)
 
-### 핵심 출력 객체
-- `vuln_records`: L1/L2/L3 통합 취약점
-- `package_records`: SBOM/패키지 위험 정보
-- `l2_reasoning_results`: L2 판정
-- `l3_validation_results`: L3 확인 상태
-- `diagnostics`, `aggregate_summary`, `previews` (markdown/json)
+확인:
 
-## 3. 아키텍처
-
-- `layer1/` : 정적 스캔, 패턴+SBOM+reachability
-- `layer2/` : `reasoning` + provider (mock/openai/gemini) + 시나리오 추론
-- `vsh_runtime/` : 통합 엔진, 리포트, risk 연산, watch, pipeline 관제
-- `models/` : 공통 스키마 (`VulnRecord`, `PackageRecord`)
-- `tests/` : 유닛/통합/엔드투엔드
-
-### 업데이트된 핵심 처치
-- reachability 강화: 함수 기반 call graph + global script heuristics
-- L2 provider추상화: `LLM_PROVIDER` env 선택 (`mock` 기본)
-- L3 validator: `l3_validator` cold path (evidence driven) + L2 confidence 허용
-- 리포트: engine에서 `l3_*` 필드 포함
-
-## 4. 설치
-
-```bash
-cd /workspaces/VSH/VSH_Project_MVP
-python -m pip install -r requirements.txt
-python -m pip install pytest
+```powershell
+python --version
+node --version
+npm --version
 ```
 
-옵션 (Gemini):
-```bash
-export GEMINI_API_KEY="<your key>"
-export LLM_PROVIDER=gemini
+---
+
+## 2) zip 해제 후 가장 쉬운 실행 (기본 시연 루트)
+
+1. zip 해제
+2. 루트 폴더에서 `run_vsh.bat` 더블클릭
+
+`run_vsh.bat` → `setup_and_run.ps1`가 자동으로 아래를 수행합니다.
+
+- `VSH_Project_MVP` 경로 자동 인식
+- `.venv` 생성
+- `pip install -r requirements.txt`
+- `vsh_desktop`의 `npm install`
+- API 서버 실행 (`python -m uvicorn vsh_api.main:app --host 127.0.0.1 --port 3000`)
+- Desktop 실행 (`npm run electron-dev`)
+
+---
+
+## 3) PowerShell 1-스크립트 실행
+
+```powershell
+.\setup_and_run.ps1
 ```
 
-## 5. 실행
+옵션:
 
-### 로컬 샘플
-```bash
-PYTHONPATH=. python VSH_Project_MVP/scripts/vsh_cli.py scan-file /path/to/code.py --format json
+```powershell
+# 이미 설치가 끝났다면 설치 단계 건너뛰기
+.\setup_and_run.ps1 -SkipInstall
+
+# VS Code 확장까지 함께 설치/컴파일
+.\setup_and_run.ps1 -RunVsCodeExtension
 ```
 
-### 테스트
-```bash
-cd /workspaces/VSH/VSH_Project_MVP
-PYTHONPATH=. pytest -q tests/test_runtime_workflow.py tests/test_l1_integration_scanner.py
+---
+
+## 4) `.env` 설정 방법
+
+```powershell
+cd .\VSH_Project_MVP
+copy .env.example .env
 ```
 
-## 6. 체크리스트 / 릴리즈 포인트
+권장 값:
 
-- ✅ `L1` : typosquatting, SBOM, 경로/의존성 위험
-- ✅ `L2` : 도메인 기반 reasoning + `is_vulnerable` 메타
-- ✅ `L3` : static evidence 확인 + 추천 수정
-- ✅ `report` : JSON/Markdown/aggregate
-- ✅ `git push` (rasasoe-integration)
+- `LLM_PROVIDER=gemini` (실 LLM 사용)
+- `GOOGLE_API_KEY=...`
+- `OPENAI_API_KEY=...` (OpenAI 사용할 때)
+- `VITE_API_BASE_URL=http://127.0.0.1:3000`
 
-## 7. 기여
+키가 없으면 `mock` provider로도 기본 시연은 가능합니다.
 
-- 브랜치: `rasasoe-integration` (메인 작업), `L3-dev` 서브 목표
-- 커밋: `Improve L3 validation integration ...` (현재까지)
-- 이후 작업: SBOM 확대, ABI/REACH 확률 모델, L3 POC 엔진, IDE 리포트 플러그인
+---
 
-## 9. 새로운 확장 모듈
+## 5) 수동 실행 방법 (문제 해결용)
 
-### vsh_api (Python API 래퍼)
-- FastAPI 기반 HTTP API
-- 엔드포인트: `/scan/file`, `/scan/project`, `/diagnostics`, `/watch/start`, `/watch/stop`, `/health`
-- 저장 경로: 파일 분석 시 `file.parent/.vsh`, 프로젝트 시 `project_root/.vsh`
-- 실행: `cd VSH_Project_MVP/vsh_api && uvicorn main:app --host 0.0.0.0 --port 3000`
+### API 수동 실행
 
-### vsh_desktop (데스크톱 앱)
-- Electron + React + TypeScript
-- 기능: 파일/폴더 선택, 스캔, 대시보드, findings 테이블, 상세 패널, 코드 프리뷰, watch mode, export JSON
-- UI: 로딩 스피너, 에러 메시지, severity badge, 카드 레이아웃
-- 설치: `cd VSH_Project_MVP/vsh_desktop && npm install`
-- 실행: `npm run electron-dev` (API 먼저 실행)
-- 빌드: `npm run build`
-
-### vsh_vscode (VS Code 확장)
-- TypeScript 기반 확장
-- 명령: "VSH: Analyze Current File", "VSH: Analyze Workspace", "VSH: Show Finding Details"
-- 기능: Problems 패널 diagnostics, Hover (reasoning/fix), Code Action (Quick Fix), Webview 상세 패널
-- 설정: vsh.apiUrl, vsh.watchOnSave
-- 설치: `cd VSH_Project_MVP/vsh_vscode && npm install && npm run compile`
-- 실행: VS Code에서 F5 디버그
-
-### 사용법
-1. API 실행: `uvicorn VSH_Project_MVP.vsh_api.main:app --host 0.0.0.0 --port 3000`
-2. 데스크톱: `cd VSH_Project_MVP/vsh_desktop && npm run electron-dev`
-3. VS Code: 확장 설치 후 명령 실행, hover/code action 사용
-
-### 시연 시나리오
-- 데스크톱 앱 실행 → 파일 선택 → 스캔 → findings 확인 → 상세 패널 → 코드 프리뷰 → export
-- VS Code에서 파일 열기 → "VSH: Analyze Current File" → Problems 패널 확인 → hover → Quick Fix → Webview 상세
-
-### 파일 트리
-```
-VSH_Project_MVP/
-├── vsh_api/
-│   └── main.py
-├── vsh_desktop/
-│   ├── package.json
-│   ├── main.ts
-│   ├── preload.ts
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── index.tsx
-│   │   └── components/
-│   │       ├── Dashboard.tsx
-│   │       ├── FindingsTable.tsx
-│   │       ├── DetailPanel.tsx
-│   │       ├── CodePreview.tsx
-│   │       ├── SettingsPage.tsx
-│   │       └── SetupWizard.tsx
-│   └── vite.config.ts
-├── vsh_vscode/
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
-│       └── extension.ts
-└── .env
+```powershell
+cd .\VSH_Project_MVP
+.\.venv\Scripts\python.exe -m uvicorn vsh_api.main:app --host 127.0.0.1 --port 3000
 ```
 
-## 10. Settings & Setup
-- `.vsh/config.json`에 설정 저장 (default 설정 포함)
-- `GET /settings`, `POST /settings` API로 설정 조회/저장
-- `POST /settings/test-llm` : LLM key 연결 확인
-- `POST /settings/check-syft` : Syft 설치/경로 확인
-- `GET /system/status` : API / Python / Syft / LLM 상태 반환
-- Desktop Settings UI: AI, Analysis Tools, Scan, Output, System 탭
-- Setup Wizard: 첫 실행에 순차 설정 (LLM provider, key, Syft, 기본 옵션)
+> `main:app`가 아니라 **반드시** `vsh_api.main:app`를 사용하세요.
 
-## 11. 환경 파일
-- `.env.example`에 VSH_API_URL, VITE_VSH_API_URL, VSH_WATCH_ON_SAVE 추가
-- `.env`에 로컬 환경설정 저장
+### Desktop 수동 실행
 
+```powershell
+cd .\VSH_Project_MVP\vsh_desktop
+npm run electron-dev
+```
 
+### 브라우저 개발 확인
+
+`npm run dev` 후 `http://localhost:5173` 접속 시, Electron 기능 없이도 기본 UI가 렌더링됩니다.
+
+---
+
+## 6) 기본 시연 순서
+
+1. `run_vsh.bat` 실행
+2. Desktop 실행 확인
+3. Setup Wizard / Settings에서 API key, Syft 상태 확인
+4. 취약 샘플 폴더(`cmd_injection.py`, `path.py`, `rce.py`, `secret.py`, `sqli.py` 포함)를 선택
+5. `Scan Project` 클릭
+6. Findings / Detail / Code Preview 확인
+
+---
+
+## 7) VS Code 확장 시연 루트 (선택)
+
+기본 시연은 Desktop + API만으로 충분합니다.
+
+확장 시연이 필요할 때만:
+
+```powershell
+cd .\VSH_Project_MVP\vsh_vscode
+npm install
+npm run compile
+```
+
+---
+
+## 8) 최종 실행 관련 파일 트리
+
+```text
+VSH/
+├─ run_vsh.bat
+├─ setup_and_run.ps1
+├─ README.md
+└─ VSH_Project_MVP/
+   ├─ requirements.txt
+   ├─ .env.example
+   ├─ config.py
+   ├─ vsh_api/main.py
+   ├─ repository/
+   │  ├─ fix_repo.py
+   │  ├─ knowledge_repo.py
+   │  └─ log_repo.py
+   └─ vsh_desktop/
+      ├─ main.ts
+      ├─ preload.ts
+      └─ src/App.tsx
+```

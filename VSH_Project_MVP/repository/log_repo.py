@@ -12,7 +12,10 @@ try:
 except ImportError:
     DEFAULT_LOG_PATH = str(Path(__file__).resolve().parent.parent / "mock_db" / "log.json")
 
-LOG_PATH = os.getenv("LOG_PATH", DEFAULT_LOG_PATH)
+LOG_PATH = str(Path(os.getenv("LOG_PATH", DEFAULT_LOG_PATH)).resolve())
+Path(LOG_PATH).parent.mkdir(parents=True, exist_ok=True)
+if not Path(LOG_PATH).exists():
+    Path(LOG_PATH).write_text("[]", encoding="utf-8")
 
 class MockLogRepo(BaseWriteRepository):
     """

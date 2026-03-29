@@ -7,12 +7,23 @@ import CodePreview from './components/CodePreview';
 import SettingsPage from './components/SettingsPage';
 import SetupWizard from './components/SetupWizard';
 
-// API URL 설정화
-const getApiBase = () => {
-  if (process.env.NODE_ENV === 'development') {
-    return process.env.VITE_VSH_API_URL || 'http://localhost:3000';
+declare global {
+  interface Window {
+    electronAPI?: {
+      openFile: () => Promise<string | undefined>;
+      openDirectory: () => Promise<string | undefined>;
+      getRuntimeInfo?: () => Promise<{ isElectron: boolean; apiBase?: string }>;
+    };
   }
-  return process.env.VITE_VSH_API_URL || 'http://localhost:3000';
+}
+
+const getApiBase = () => {
+  const env = import.meta.env as Record<string, string | undefined>;
+  return (
+    env.VITE_API_BASE_URL ||
+    env.VITE_VSH_API_URL ||
+    'http://127.0.0.1:3000'
+  );
 };
 
 const API_BASE = getApiBase();
@@ -53,6 +64,8 @@ function App() {
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [watchMode, setWatchMode] = useState(false);
   const [view, setView] = useState<'scanner' | 'settings' | 'wizard'>('scanner');
+  const [apiOnline, setApiOnline] = useState(true);
+  const [apiStatusMessage, setApiStatusMessage] = useState('');
 
   useEffect(() => {
     const complete = localStorage.getItem('vsh_setup_complete') === 'true';
@@ -63,13 +76,44 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    const checkApi = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/health`, { timeout: 1500 });
+        if (!mounted) return;
+        setApiOnline(res.status === 200);
+        setApiStatusMessage('');
+      } catch (e) {
+        if (!mounted) return;
+        setApiOnline(false);
+        setApiStatusMessage('API 서버에 연결할 수 없습니다. run_vsh.bat 또는 setup_and_run.ps1로 API를 먼저 실행하세요.');
+      }
+    };
+
+    checkApi();
+    const timer = window.setInterval(checkApi, 5000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const selectFile = async () => {
-    const result = await (window as any).electronAPI.openFile();
+    if (!window.electronAPI?.openFile) {
+      setError('브라우저 모드입니다. 파일 선택기 대신 경로를 직접 입력하세요.');
+      return;
+    }
+    const result = await window.electronAPI.openFile();
     if (result) setPath(result);
   };
 
   const selectFolder = async () => {
-    const result = await (window as any).electronAPI.openDirectory();
+    if (!window.electronAPI?.openDirectory) {
+      setError('브라우저 모드입니다. 폴더 경로를 직접 입력하세요.');
+      return;
+    }
+    const result = await window.electronAPI.openDirectory();
     if (result) setPath(result);
   };
 
@@ -133,6 +177,12 @@ function App() {
       <div style={{ flex: 1, padding: 20, backgroundColor: '#f5f5f5' }}>
         <h1 style={{ color: '#333', marginBottom: 20 }}>🛡️ VSH Security Scanner</h1>
         
+        {!apiOnline && (
+          <div style={{ marginBottom: 20, padding: 12, backgroundColor: '#fff7ed', border: '1px solid #fb923c', borderRadius: 8, color: '#9a3412' }}>
+            ⚠️ <strong>API Offline:</strong> {apiStatusMessage}
+          </div>
+        )}
+
         <div style={{ marginBottom: 20, padding: 15, backgroundColor: 'white', borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
           <h3>📂 Select Target</h3>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
@@ -168,6 +218,15 @@ function App() {
           <div style={{ fontSize: '14px', color: '#666' }}>
             Selected: {path || 'None'}
           </div>
+          <div style={{ marginTop: 10 }}>
+            <input
+              type="text"
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              placeholder="브라우저 모드에서는 경로를 직접 입력하세요 (예: C:\\VSH\\vuln_project)"
+              style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px solid #ddd' }}
+            />
+          </div>
         </div>
 
         <div style={{ marginBottom: 20, padding: 15, backgroundColor: 'white', borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
@@ -175,7 +234,7 @@ function App() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
             <button 
               onClick={() => scan('file')} 
-              disabled={loading || !path}
+              disabled={loading || !path || !apiOnline}
               style={{ 
                 padding: '10px 20px', 
                 backgroundColor: (loading || !path) ? '#ccc' : '#4CAF50', 
@@ -190,7 +249,7 @@ function App() {
             </button>
             <button 
               onClick={() => scan('project')} 
-              disabled={loading || !path}
+              disabled={loading || !path || !apiOnline}
               style={{ 
                 padding: '10px 20px', 
                 backgroundColor: (loading || !path) ? '#ccc' : '#4CAF50', 
@@ -205,7 +264,7 @@ function App() {
             </button>
             <button 
               onClick={toggleWatch} 
-              disabled={!path}
+              disabled={!path || !apiOnline}
               style={{ 
                 padding: '10px 20px', 
                 backgroundColor: !path ? '#ccc' : (watchMode ? '#ff9800' : '#2196F3'), 

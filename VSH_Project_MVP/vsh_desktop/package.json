@@ -2,10 +2,10 @@
   "name": "vsh-desktop",
   "version": "1.0.0",
   "description": "VSH Desktop Application",
-  "main": "dist-electron/main.js",
+  "main": "main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "vite build",
     "electron": "electron .",
     "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\""
   },
