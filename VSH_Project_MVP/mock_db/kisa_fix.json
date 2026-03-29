@@ -1,0 +1,36 @@
+[{
+    "id": "CWE-78",
+    "vulnerable": "subprocess.run(user_input, shell=True)",
+    "safe": "subprocess.run(['cmd', user_input], shell=False)",
+    "description": "shell=False + 리스트 방식으로 변경하여 명령어 주입 방지"
+  },
+  {
+    "id": "CWE-89",
+    "vulnerable": "cursor.execute('SELECT * FROM users WHERE id = %s' % user_input)",
+    "safe": "cursor.execute('SELECT * FROM users WHERE id = %s', (user_input,))",
+    "description": "파라미터 바인딩 방식으로 변경하여 SQL 인젝션 방지"
+  },
+  {
+    "id": "CWE-79",
+    "vulnerable": "return render_template_string('<h1>' + user_input + '</h1>')",
+    "safe": "return render_template_string('<h1>{{ user_input }}</h1>', user_input=user_input)",
+    "description": "Jinja2 자동 이스케이프 활용하여 XSS 방지"
+  },
+  {
+    "id": "CWE-22",
+    "vulnerable": "open(base_path + user_input)",
+    "safe": "open(os.path.join(base_path, os.path.basename(user_input)))",
+    "description": "basename으로 경로 조작 문자 제거"
+  },
+  {
+    "id": "CWE-502",
+    "vulnerable": "pickle.loads(user_data)",
+    "safe": "json.loads(user_data)",
+    "description": "pickle 대신 json 사용하여 역직렬화 취약점 방지"
+  },
+  {
+    "id": "CWE-798",
+    "vulnerable": "SECRET_KEY = 'mysecretkey123'",
+    "safe": "import os\\nSECRET_KEY = os.environ.get('SECRET_KEY')",
+    "description": "하드코딩된 비밀키 대신 환경변수에서 로드"
+  }]

@@ -1,0 +1,417 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from pathlib import Path
+import json
+import os
+import shutil
+import time
+from vsh_runtime.engine import VshRuntimeEngine
+from vsh_runtime.watcher import ProjectWatcher
+import threading
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI(title="VSH API", version="1.0.0")
+
+engine = VshRuntimeEngine()
+watchers = {}  # path -> watcher instance
+
+CONFIG_DIR = Path.home() / '.vsh'
+CONFIG_PATH = CONFIG_DIR / 'config.json'
+
+DEFAULT_CONFIG = {
+    "llm": {
+        "provider": "mock",
+        "gemini_api_key": "",
+        "openai_api_key": "",
+        "model": "gemini-1.5-pro",
+        "enable_l2": True,
+        "enable_l3": True
+    },
+    "tools": {
+        "syft_enabled": True,
+        "syft_path": "",
+        "syft_auto_detect": True
+    },
+    "scan": {
+        "watch_on_save": True,
+        "auto_scan_on_select": False,
+        "enable_sbom": True,
+        "max_files_per_scan": 200,
+        "exclude_dirs": [
+            ".git",
+            "node_modules",
+            "venv",
+            "__pycache__",
+            "dist",
+            "build"
+        ],
+        "include_extensions": [
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx"
+        ]
+    },
+    "output": {
+        "export_path": "./exports",
+        "save_json": True,
+        "save_markdown": True,
+        "save_diagnostics": True,
+        "auto_open_report_after_scan": False
+    },
+    "ui": {
+        "theme": "dark",
+        "show_code_preview": True,
+        "show_attack_scenario": True,
+        "show_validation_panel": True
+    },
+    "system": {
+        "api_base_url": "http://localhost:3000",
+        "config_version": 1
+    }
+}
+
+class ScanRequest(BaseModel):
+    path: str
+
+class WatchRequest(BaseModel):
+    path: str
+
+class AnnotateRequest(BaseModel):
+    path: str
+    in_place: bool = False
+
+def save_diagnostics(target_path: str, diagnostics: dict):
+    if Path(target_path).is_file():
+        vsh_dir = Path(target_path).parent / ".vsh"
+    else:
+        vsh_dir = Path(target_path) / ".vsh"
+    vsh_dir.mkdir(exist_ok=True)
+    diag_file = vsh_dir / "diagnostics.json"
+    with open(diag_file, "w", encoding="utf-8") as f:
+        json.dump(diagnostics, f, ensure_ascii=False, indent=2)
+
+def save_report(target_path: str, report: dict):
+    if Path(target_path).is_file():
+        vsh_dir = Path(target_path).parent / ".vsh"
+    else:
+        vsh_dir = Path(target_path) / ".vsh"
+    vsh_dir.mkdir(exist_ok=True)
+    json_file = vsh_dir / "report.json"
+    md_file = vsh_dir / "report.md"
+    with open(json_file, "w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    # Markdown은 engine에서 생성된 previews 사용
+    if "previews" in report and "markdown" in report["previews"]:
+        with open(md_file, "w", encoding="utf-8") as f:
+            f.write(report["previews"]["markdown"])
+
+
+def ensure_config_path():
+    CONFIG_DIR.mkdir(exist_ok=True, parents=True)
+    if not CONFIG_PATH.exists():
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(DEFAULT_CONFIG, f, ensure_ascii=False, indent=2)
+
+
+def load_config() -> dict:
+    ensure_config_path()
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return DEFAULT_CONFIG.copy()
+
+
+def save_config(config: dict):
+    ensure_config_path()
+    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+@app.post("/scan/file")
+def scan_file(req: ScanRequest):
+    if not Path(req.path).is_file():
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    result = engine.analyze_file(req.path)
+    save_diagnostics(req.path, result["diagnostics"])
+    save_report(req.path, result)
+    return normalize_response(result, "file", req.path)
+
+@app.post("/scan/project")
+def scan_project(req: ScanRequest):
+    if not Path(req.path).is_dir():
+        raise HTTPException(status_code=400, detail="Invalid project path")
+    result = engine.analyze_project(req.path)
+    save_diagnostics(req.path, result["diagnostics"])
+    save_report(req.path, result)
+    return normalize_response(result, "project", req.path)
+
+@app.post("/annotate/file")
+def annotate_file(req: AnnotateRequest):
+    """Generate annotated source code for a single file."""
+    try:
+        if not Path(req.path).is_file():
+            raise HTTPException(status_code=400, detail="Invalid file path")
+        
+        result = engine.annotate_file(req.path, in_place=req.in_place)
+        return {
+            "status": "success",
+            "file": req.path,
+            "in_place": req.in_place,
+            "annotated_files": result.get("annotated_files", {}),
+            "total_issues": result.get("total_issues", 0),
+            "message": f"Generated annotated version with {result.get('total_issues', 0)} issue(s) marked"
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Annotation failed: {str(e)}")
+
+@app.post("/annotate/project")
+def annotate_project(req: AnnotateRequest):
+    """Generate annotated source files for a project."""
+    try:
+        if not Path(req.path).is_dir():
+            raise HTTPException(status_code=400, detail="Invalid project path")
+        
+        result = engine.annotate_project(req.path, in_place=req.in_place)
+        return {
+            "status": "success",
+            "project": req.path,
+            "in_place": req.in_place,
+            "files_annotated": result.get("files_annotated", 0),
+            "annotated_files": result.get("annotated_files", {}),
+            "total_issues": result.get("total_issues", 0),
+            "message": f"Annotated {result.get('files_annotated', 0)} file(s) with {result.get('total_issues', 0)} issue(s) total"
+        }
+    except NotADirectoryError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Annotation failed: {str(e)}")
+
+@app.get("/diagnostics")
+def get_diagnostics(path: str):
+    if Path(path).is_file():
+        vsh_dir = Path(path).parent / ".vsh"
+    else:
+        vsh_dir = Path(path) / ".vsh"
+    diag_file = vsh_dir / "diagnostics.json"
+    if not diag_file.exists():
+        raise HTTPException(status_code=404, detail="Diagnostics not found")
+    with open(diag_file, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@app.get("/settings")
+def get_settings():
+    return load_config()
+
+
+@app.post("/settings")
+def post_settings(config: dict):
+    save_config(config)
+    return {"status": "ok", "settings": config}
+
+
+@app.post("/settings/test-llm")
+def test_llm(settings: dict):
+    provider = settings.get('provider', 'mock')
+    if provider == 'mock':
+        return {"provider": provider, "connected": True, "reason": "Mock provider always connected"}
+
+    if provider == 'gemini':
+        key = settings.get('gemini_api_key', '') or os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY', '')
+    elif provider == 'openai':
+        key = settings.get('openai_api_key', '')
+    else:
+        return {"provider": provider, "connected": False, "reason": "Unknown provider"}
+
+    if not key:
+        return {"provider": provider, "connected": False, "reason": "API key not configured"}
+
+    # 실제 호출 여부는 환경 의존, 우선 키 존재만 검증
+    return {"provider": provider, "connected": True, "reason": "API key set"}
+
+
+@app.post("/settings/check-syft")
+def check_syft(settings: dict):
+    syft_path = settings.get('syft_path', '')
+    syft_installed = False
+    syft_found = ''
+
+    if syft_path:
+        if Path(syft_path).exists():
+            syft_installed = True
+            syft_found = syft_path
+    else:
+        what = shutil.which('syft')
+        if what:
+            syft_installed = True
+            syft_found = what
+
+    return {
+        "syft": {
+            "installed": syft_installed,
+            "path": syft_found
+        }
+    }
+
+
+@app.get("/system/status")
+def system_status():
+    config = load_config()
+    syft_info = check_syft({
+        'syft_path': config.get('tools', {}).get('syft_path', '')
+    })['syft']
+    llm = config.get('llm', {})
+
+    return {
+        "api_server": "running",
+        "python_core": "ready",
+        "syft": syft_info,
+        "llm": {
+            "provider": llm.get('provider', 'mock'),
+            "configured": bool((llm.get('gemini_api_key') or llm.get('openai_api_key') or os.environ.get('GOOGLE_API_KEY'))),
+            "connected": llm.get('provider', 'mock') == 'mock' or bool(llm.get('gemini_api_key') or llm.get('openai_api_key') or os.environ.get('GOOGLE_API_KEY'))
+        },
+        "config_path": str(CONFIG_PATH)
+    }
+
+@app.post("/watch/start")
+def watch_start(req: WatchRequest):
+    """Start watching a file or directory for changes."""
+    if not Path(req.path).exists():
+        raise HTTPException(status_code=400, detail="Path does not exist")
+    
+    if req.path in watchers:
+        raise HTTPException(status_code=400, detail="Watcher already running for this path")
+    
+    watcher = ProjectWatcher(req.path, debounce_sec=1.0)
+    if not watcher.start():
+        raise HTTPException(status_code=500, detail="Failed to start watcher")
+    
+    watchers[req.path] = watcher
+    
+    def process_watch_results():
+        """Background thread to process watcher results."""
+        while watcher.is_running():
+            results = watcher.get_last_results()
+            for result in results:
+                try:
+                    if result.get("type") == "modified":
+                        analysis = result.get("analysis")
+                        if analysis:
+                            file_path = result.get("path")
+                            save_diagnostics(file_path, analysis.get("diagnostics", {}))
+                            save_report(file_path, analysis)
+                            print(f"[WATCH] Saved analysis for {file_path}")
+                    elif result.get("type") == "error":
+                        print(f"[WATCH] Error analyzing {result.get('path')}: {result.get('error')}")
+                except Exception as e:
+                    print(f"[WATCH] Failed to save results: {e}")
+            
+            time.sleep(0.1)
+    
+    result_processor = threading.Thread(target=process_watch_results, daemon=True)
+    result_processor.start()
+    
+    return {
+        "status": "started",
+        "path": req.path,
+        "message": "Watch mode enabled. File changes will trigger automatic analysis."
+    }
+
+@app.post("/watch/stop")
+def watch_stop(req: WatchRequest):
+    """Stop watching a file or directory."""
+    if req.path not in watchers:
+        raise HTTPException(status_code=400, detail="No active watcher for this path")
+    
+    watcher = watchers[req.path]
+    if not watcher.stop():
+        raise HTTPException(status_code=500, detail="Failed to stop watcher")
+    
+    del watchers[req.path]
+    return {
+        "status": "stopped",
+        "path": req.path,
+        "message": "Watch mode disabled."
+    }
+
+@app.get("/watch/status")
+def watch_status():
+    """Get status of all active watchers."""
+    return {
+        "active_watchers": len(watchers),
+        "watched_paths": list(watchers.keys())
+    }
+
+@app.get("/file/content")
+def get_file_content(path: str):
+    file_path = Path(path)
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"content": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+def normalize_response(result: dict, mode: str, target: str) -> dict:
+    findings = []
+    for v in result.get("vuln_records", []):
+        finding = {
+            "id": v.get("vuln_id"),
+            "file": v.get("file_path"),
+            "line": v.get("line_number"),
+            "end_line": v.get("end_line_number", v.get("line_number")),
+            "severity": v.get("severity"),
+            "rule_id": v.get("rule_id"),
+            "message": v.get("evidence"),
+            "evidence": v.get("evidence"),
+            "reachability_status": v.get("reachability_status"),
+            "reachability_confidence": v.get("reachability_confidence", 0.0),
+            "l2_reasoning": {
+                "is_vulnerable": v.get("is_vulnerable", False),
+                "confidence": v.get("l2_confidence", 0.0),
+                "reasoning": v.get("reasoning_verdict", ""),
+                "attack_scenario": v.get("l3_attack_scenario", ""),
+                "fix_suggestion": v.get("fix_suggestion", "")
+            },
+            "l3_validation": {
+                "validated": v.get("l3_validated", False),
+                "exploit_possible": v.get("exploit_possible", False),
+                "confidence": v.get("l3_confidence", 0.0),
+                "evidence": v.get("evidence", ""),
+                "recommended_fix": v.get("fix_suggestion", "")
+            }
+        }
+        findings.append(finding)
+    
+    summary = result.get("aggregate_summary", {})
+    top_risky_files = sorted(
+        [(f, len([v for v in result.get("vuln_records", []) if v.get("file_path") == f])) for f in set(v.get("file_path") for v in result.get("vuln_records", []))],
+        key=lambda x: x[1], reverse=True
+    )[:5]
+    
+    return {
+        "target": target,
+        "mode": mode,
+        "findings": findings,
+        "summary": {
+            "total": len(findings),
+            "critical": summary.get("risk_distribution", {}).get("P1", 0),
+            "high": summary.get("risk_distribution", {}).get("P2", 0),
+            "medium": summary.get("risk_distribution", {}).get("P3", 0),
+            "low": summary.get("risk_distribution", {}).get("P4", 0) + summary.get("risk_distribution", {}).get("INFO", 0),
+            "top_risky_files": top_risky_files
+        }
+    }

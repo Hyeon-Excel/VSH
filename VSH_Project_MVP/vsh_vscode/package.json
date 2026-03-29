@@ -1,0 +1,56 @@
+{
+  "name": "vsh-vscode",
+  "displayName": "VSH Security Scanner",
+  "version": "1.0.0",
+  "description": "VS Code extension for VSH security scanning",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onCommand:vsh.analyzeFile", "onCommand:vsh.analyzeWorkspace"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vsh.analyzeFile",
+        "title": "VSH: Analyze Current File"
+      },
+      {
+        "command": "vsh.analyzeWorkspace",
+        "title": "VSH: Analyze Workspace"
+      },
+      {
+        "command": "vsh.showDetails",
+        "title": "VSH: Show Finding Details"
+      }
+    ],
+    "configuration": {
+      "title": "VSH",
+      "properties": {
+        "vsh.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "VSH API base URL"
+        },
+        "vsh.watchOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically scan on save"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.70.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
