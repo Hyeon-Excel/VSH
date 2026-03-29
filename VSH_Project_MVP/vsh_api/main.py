@@ -96,6 +96,18 @@ def watch_stop(req: WatchRequest):
     del watchers[req.path]
     return {"status": "stopped"}
 
+@app.get("/file/content")
+def get_file_content(path: str):
+    file_path = Path(path)
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"content": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

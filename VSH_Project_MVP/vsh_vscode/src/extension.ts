@@ -26,7 +26,16 @@ export function activate(context: vscode.ExtensionContext) {
     showWebviewPanel(finding);
   });
 
-  context.subscriptions.push(analyzeFileCmd, analyzeWorkspaceCmd, showDetailsCmd);
+  const markReviewedCmd = vscode.commands.registerCommand('vsh.markReviewed', async (finding: any) => {
+    // Remove the diagnostic for this finding
+    const uri = vscode.Uri.file(finding.file);
+    const currentDiagnostics = diagnosticCollection.get(uri) || [];
+    const filteredDiagnostics = currentDiagnostics.filter(d => (d.code as any)?.id !== finding.id);
+    diagnosticCollection.set(uri, filteredDiagnostics);
+    vscode.window.showInformationMessage(`Finding marked as reviewed: ${finding.message}`);
+  });
+
+  context.subscriptions.push(analyzeFileCmd, analyzeWorkspaceCmd, showDetailsCmd, markReviewedCmd);
 
   // Hover Provider
   const hoverProvider = vscode.languages.registerHoverProvider('python', {
@@ -35,12 +44,22 @@ export function activate(context: vscode.ExtensionContext) {
       const lineDiagnostics = diagnostics.filter(d => d.range.start.line === position.line);
       if (lineDiagnostics.length > 0) {
         const diag = lineDiagnostics[0];
-        const finding = diag.code as any; // Assume finding data
+        const finding = diag.code as any;
+        const severityEmoji = diag.severity === vscode.DiagnosticSeverity.Error ? '🚨' : '⚠️';
         return new vscode.Hover([
-          `**Severity:** ${diag.severity === vscode.DiagnosticSeverity.Error ? 'CRITICAL' : 'HIGH'}`,
-          `**Evidence:** ${diag.message}`,
+          `${severityEmoji} **${diag.severity === vscode.DiagnosticSeverity.Error ? 'CRITICAL' : 'HIGH'}** - ${diag.message}`,
+          '',
+          `**Evidence:** ${finding?.evidence || 'N/A'}`,
+          '',
           `**L2 Reasoning:** ${finding?.l2_reasoning?.reasoning || 'N/A'}`,
-          `**Fix:** ${finding?.l2_reasoning?.fix_suggestion || 'N/A'}`
+          `**Confidence:** ${finding?.l2_reasoning?.confidence ? Math.round(finding.l2_reasoning.confidence * 100) + '%' : 'N/A'}`,
+          '',
+          `**Attack Scenario:** ${finding?.l2_reasoning?.attack_scenario || 'N/A'}`,
+          '',
+          `**L3 Validation:** ${finding?.l3_validation?.validated ? '✅ Validated' : '❌ Not validated'}`,
+          `**Exploit Possible:** ${finding?.l3_validation?.exploit_possible ? '🚨 YES' : '✅ NO'}`,
+          '',
+          `**Fix Suggestion:** ${finding?.l2_reasoning?.fix_suggestion || 'N/A'}`
         ]);
       }
       return null;
@@ -53,13 +72,34 @@ export function activate(context: vscode.ExtensionContext) {
       const actions: vscode.CodeAction[] = [];
       for (const diag of context.diagnostics) {
         if (diag.source === 'vsh') {
-          const action = new vscode.CodeAction('Show VSH Details', vscode.CodeActionKind.QuickFix);
-          action.command = {
+          const finding = diag.code as any;
+          
+          // Show Details action
+          const showDetailsAction = new vscode.CodeAction('🔍 Show VSH Details', vscode.CodeActionKind.QuickFix);
+          showDetailsAction.command = {
             command: 'vsh.showDetails',
             title: 'Show Details',
-            arguments: [diag.code] // finding data
+            arguments: [finding]
           };
-          actions.push(action);
+          actions.push(showDetailsAction);
+          
+          // Quick Fix action if fix suggestion exists
+          if (finding?.l2_reasoning?.fix_suggestion) {
+            const fixAction = new vscode.CodeAction('🔧 Apply VSH Fix', vscode.CodeActionKind.QuickFix);
+            fixAction.edit = new vscode.WorkspaceEdit();
+            fixAction.edit.replace(document.uri, diag.range, finding.l2_reasoning.fix_suggestion);
+            fixAction.diagnostics = [diag];
+            actions.push(fixAction);
+          }
+          
+          // Mark as reviewed action
+          const markReviewedAction = new vscode.CodeAction('✅ Mark as Reviewed', vscode.CodeActionKind.QuickFix);
+          markReviewedAction.command = {
+            command: 'vsh.markReviewed',
+            title: 'Mark as Reviewed',
+            arguments: [finding]
+          };
+          actions.push(markReviewedAction);
         }
       }
       return actions;
@@ -143,26 +183,67 @@ function showWebviewPanel(finding: any) {
 }
 
 function getWebviewContent(finding: any) {
+  const severityColor = finding.severity === 'CRITICAL' ? '#ff4444' : '#ff8800';
+  const vulnColor = finding.l2_reasoning.is_vulnerable ? '#ff4444' : '#44ff44';
+  const exploitColor = finding.l3_validation.exploit_possible ? '#ff4444' : '#44ff44';
+  
   return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>VSH Details</title>
+        <title>VSH Finding Details</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+          .header { background-color: ${severityColor}; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+          .section { background-color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          .l2-section { border-left: 4px solid #2196F3; }
+          .l3-section { border-left: 4px solid #ff9800; }
+          .vulnerable { color: ${vulnColor}; font-weight: bold; }
+          .exploit { color: ${exploitColor}; font-weight: bold; }
+          .code { background-color: #2d3748; color: #e2e8f0; padding: 10px; border-radius: 4px; font-family: Monaco, monospace; }
+          .fix { background-color: #e8f5e8; padding: 10px; border-radius: 4px; border: 1px solid #44ff44; }
+          .attack { background-color: #ffebee; padding: 10px; border-radius: 4px; border: 1px solid #ff4444; }
+        </style>
     </head>
     <body>
-        <h1>Finding Details</h1>
-        <p><strong>File:</strong> ${finding.file}</p>
-        <p><strong>Line:</strong> ${finding.line}</p>
-        <p><strong>Severity:</strong> ${finding.severity}</p>
-        <p><strong>Message:</strong> ${finding.message}</p>
-        <h2>L2 Reasoning</h2>
-        <p>${finding.l2_reasoning.reasoning}</p>
-        <p><strong>Fix:</strong> ${finding.l2_reasoning.fix_suggestion}</p>
-        <h2>L3 Validation</h2>
-        <p>Validated: ${finding.l3_validation.validated}</p>
-        <p>Exploit Possible: ${finding.l3_validation.exploit_possible}</p>
+        <div class="header">
+            <h1>🔍 VSH Finding Details</h1>
+            <h2>${finding.severity} - ${finding.rule_id}</h2>
+        </div>
+        
+        <div class="section">
+            <h3>📁 Basic Information</h3>
+            <p><strong>File:</strong> ${finding.file}</p>
+            <p><strong>Line:</strong> ${finding.line} - ${finding.end_line}</p>
+            <p><strong>Message:</strong> ${finding.message}</p>
+            <p><strong>Evidence:</strong> ${finding.evidence}</p>
+            <p><strong>Reachability:</strong> ${finding.reachability_status} (${Math.round(finding.reachability_confidence * 100)}%)</p>
+        </div>
+        
+        <div class="section l2-section">
+            <h3>🧠 L2 Reasoning (AI Analysis)</h3>
+            <p><strong>Vulnerable:</strong> <span class="vulnerable">${finding.l2_reasoning.is_vulnerable ? 'YES' : 'NO'}</span></p>
+            <p><strong>Confidence:</strong> ${Math.round(finding.l2_reasoning.confidence * 100)}%</p>
+            <p><strong>Reasoning:</strong></p>
+            <div class="code">${finding.l2_reasoning.reasoning}</div>
+            <p><strong>Attack Scenario:</strong></p>
+            <div class="attack">${finding.l2_reasoning.attack_scenario}</div>
+            <p><strong>Fix Suggestion:</strong></p>
+            <div class="fix">${finding.l2_reasoning.fix_suggestion}</div>
+        </div>
+        
+        <div class="section l3-section">
+            <h3>🔬 L3 Validation (Deep Analysis)</h3>
+            <p><strong>Validated:</strong> ${finding.l3_validation.validated ? 'YES' : 'NO'}</p>
+            <p><strong>Exploit Possible:</strong> <span class="exploit">${finding.l3_validation.exploit_possible ? 'YES - EXPLOITABLE!' : 'NO'}</span></p>
+            <p><strong>Confidence:</strong> ${Math.round(finding.l3_validation.confidence * 100)}%</p>
+            <p><strong>Evidence:</strong></p>
+            <div class="code">${finding.l3_validation.evidence}</div>
+            <p><strong>Recommended Fix:</strong></p>
+            <div class="fix">${finding.l3_validation.recommended_fix}</div>
+        </div>
     </body>
     </html>
   `;
