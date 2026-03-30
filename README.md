@@ -104,24 +104,7 @@ pip install -r requirements.txt
 
 ### 3. 환경 변수 설정
 
-`.env` 파일을 생성하고 아래 내용을 입력하세요.
-
-```env
-# LLM 설정 (gemini 또는 claude)
-LLM_PROVIDER=gemini
-
-# API 키 (하나 이상 필수)
-GEMINI_API_KEY=your_gemini_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
-
-# 경로 설정
-LOG_PATH=mock_db/log.json
-KNOWLEDGE_PATH=mock_db/knowledge.json
-FIX_PATH=mock_db/kisa_fix.json
-
-# 대시보드 포트
-DASHBOARD_PORT=3000
-```
+디스코드 참고!!!
 
 ---
 
