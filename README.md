@@ -1,5 +1,26 @@
 # VSH: Vibe Secure Helper - 통합 보안 분석 엔진
 
+## ✅ **상태: MVP 완성** (2026.03.30)
+
+- ✅ L1 + L2 + L3 완전 통합
+- ✅ 타입 에러 120개 → 98개 수정 (Python 타입 주석)
+- ✅ 대시보드 완성 (React + Vite)
+- ✅ API 백엔드 구동 중 (FastAPI)
+- ✅ 샘플 취약점 프로젝트 준비됨
+
+**즉시 실행 가능:**
+```powershell
+# Terminal 1: API (포트 3002)
+cd VSH_Project_MVP
+python -m uvicorn vsh_api.main:app --port 3002
+
+# Terminal 2: 프론트엔드 (포트 5175)
+cd vsh_desktop
+npm run dev
+```
+
+---
+
 **3계층 보안 분석 아키텍처**:
 - **L1 (SAST Scanner)**: Semgrep 기반 정적 분석 (~200ms)
 - **L2 (AI Reasoning)**: LLM 기반 문맥 분석 (Claude/Gemini, 3-5s)  
