@@ -1,4 +1,5 @@
-[  {
+[
+  {
     "id": "CWE-78",
     "name": "OS Command Injection",
     "description": "사용자 입력이 OS 명령어에 직접 전달됨",
@@ -10,7 +11,7 @@
     "id": "CWE-89",
     "name": "SQL Injection",
     "description": "사용자 입력이 SQL 쿼리에 직접 삽입됨",
-    "pattern":  "cursor\\.execute\\(query\\)|execute\\(f[\"']SELECT",
+    "pattern": "cursor\\.execute\\(query\\)|execute\\(f[\"']SELECT",
     "reference": "KISA 시큐어코딩 DB-01",
     "severity": "HIGH"
   },
@@ -45,4 +46,13 @@
     "pattern": "SECRET_KEY\\s*=\\s*['\"][a-zA-Z0-9]+['\"]",
     "reference": "KISA 시큐어코딩 AM-01",
     "severity": "HIGH"
-  }]
+  },
+  {
+    "id": "CWE-829",
+    "name": "Inclusion of Functionality from Untrusted Control Sphere",
+    "description": "??? ??? ?? ?????? ????? ???? ??? ?? ??",
+    "pattern": "requirements.txt.*==",
+    "reference": "KISA ????? SW-8",
+    "severity": "HIGH"
+  }
+]

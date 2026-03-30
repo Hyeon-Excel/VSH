@@ -11,6 +11,20 @@ CWE_META = {
     "CWE-502": {"owasp": "A08:2021 - Software and Data Integrity",   "cvss": 9.8},
 }
 
+def _get_kisa_ref(cwe_id: str) -> str:
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../VSH-l1-l2-integration/VSH_Project_MVP"))
+        from layer2.retriever.chroma_retriever import ChromaRetriever
+        retriever = ChromaRetriever()
+        if retriever.ready:
+            docs = retriever.query_by_source(cwe_id, source="KISA", n_results=1)
+            if docs:
+                return docs[0].get("kisa_article", "") or ""
+    except Exception:
+        pass
+    return ""
+
 def apply_cwe_meta(record):
     if not hasattr(record, "cwe_id"):
         return record
@@ -20,6 +34,10 @@ def apply_cwe_meta(record):
             record.owasp_ref = meta.get("owasp", record.owasp_ref)
         if record.cvss_score is None:
             record.cvss_score = meta.get("cvss", record.cvss_score)
+    if not record.kisa_ref or record.kisa_ref in ("N/A", "") or "가이드 참조" in (record.kisa_ref or ""):
+        kisa = _get_kisa_ref(record.cwe_id)
+        if kisa:
+            record.kisa_ref = kisa
     return record
 
 class L3Normalizer:
