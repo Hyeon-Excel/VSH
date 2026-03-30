@@ -20,6 +20,8 @@ from watchdog.events import FileSystemEventHandler
 
 WATCH_DIR = os.path.abspath(os.path.dirname(__file__))
 WATCH_TARGET = os.path.abspath(os.path.join(WATCH_DIR, "vuln_sample.py"))
+_SCAN_DONE = False
+_SCAN_DONE = False
 
 BANNER = """
 ╔══════════════════════════════════════╗
@@ -30,15 +32,24 @@ BANNER = """
 
 
 def _run_l3(file_path: str) -> None:
+    global _SCAN_DONE
+
     async def _inner():
         await l3_pipeline.run(WATCH_DIR)
         print("[L3] 리포트 생성 중...")
         try:
             report_path = await report_generator.generate()
             print(f"[L3] 리포트 생성 완료: {report_path}")
+            print()
+            print("=" * 54)
+            print("✅  VSH 스캔 완료")
+            print("=" * 54)
+            print()
         except Exception as e:
             print(f"[L3] 리포트 생성 실패: {e}")
+
     asyncio.run(_inner())
+    _SCAN_DONE = True
 
 
 class VSHFileHandler(FileSystemEventHandler):
@@ -79,8 +90,10 @@ def main():
     trigger.start()
 
     try:
-        while True:
+        while not _SCAN_DONE:
             time.sleep(1)
+        print("\n[VSH Demo] 종료 중...")
+        observer.stop()
     except KeyboardInterrupt:
         print("\n[VSH Demo] 종료 중...")
         observer.stop()
