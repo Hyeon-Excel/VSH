@@ -1,5 +1,12 @@
 # VSH — Vibe Secure Helper
 
+
+** 터미널 시작 명령어 **
+
+chcp 65001
+$env:PYTHONIOENCODING="utf-8"
+python vsh_demo.py
+
 **AI 기반 보안 취약점 자동 탐지 및 수정 제안 도구**
 
 VSH는 개발자가 코드를 작성하는 동안 보안 취약점을 실시간으로 탐지하고, LLM(Google Gemini / Anthropic Claude)을 통해 수정 코드를 자동 생성하는 MCP(Model Context Protocol) 서버입니다. Claude IDE / Cursor와 통합하여 사용할 수 있습니다.
