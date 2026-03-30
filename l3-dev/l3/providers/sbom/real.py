@@ -1,4 +1,3 @@
-notepad "C:\Users\LG\Desktop\VSH_Project - 복사본\VSH_Project_MVP\l3-dev\l3\providers\sbom\real.py"
 
 import json
 import subprocess
@@ -52,7 +51,7 @@ class RealSBOMProvider(AbstractSBOMProvider):
 
     def _run_syft(self, project_path: str) -> List[dict]:
         try:
-            scan_dir = str(Path(project_path).parent)
+            scan_dir = str(Path(project_path))
             result = subprocess.run(
                 ["syft", scan_dir, "-o", "json"],
                 capture_output=True, text=True, timeout=60
@@ -184,7 +183,7 @@ class RealSBOMProvider(AbstractSBOMProvider):
         try:
             p = Path(project_path)
             langs = []
-            if (p / "requirements.txt").exists():
+            if any(p.rglob("requirements.txt")):
                 langs.append("python")
             if (p / "package.json").exists():
                 langs.append("js")

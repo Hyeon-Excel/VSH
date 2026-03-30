@@ -36,6 +36,20 @@ class L3ReportGenerator:
         
         vuln_records = await self.db.read_all_vuln()
         package_records = await self.db.read_all_package()
+
+        # vuln_id ?? ?? ?? (poc_verified > poc_failed > poc_skipped > pending ????)
+        STATUS_PRIORITY = {
+            "poc_verified": 0, "poc_failed": 1, "poc_skipped": 2,
+            "pending": 3, "accepted": 4, "dismissed": 5, "scan_error": 6
+        }
+        seen = {}
+        for r in vuln_records:
+            vid = r.vuln_id
+            if vid not in seen:
+                seen[vid] = r
+            elif STATUS_PRIORITY.get(r.status, 99) < STATUS_PRIORITY.get(seen[vid].status, 99):
+                seen[vid] = r
+        vuln_records = list(seen.values())
         now = datetime.now()
         
         content = "\n\n".join([
@@ -202,7 +216,7 @@ Reachability 확인 (실제 위협)     {reachable}건
         impact = self.IMPACT_MAP.get(r.vuln_type, self.IMPACT_MAP["UNKNOWN"])
         cvss = r.cvss_score if r.cvss_score is not None else "N/A"
         owasp = r.owasp_ref or "N/A"
-        evidence = r.code_snippet or "N/A"
+        evidence = getattr(r, "code_snippet", None) or getattr(r, "evidence", None) or "N/A"
 
         lines = [
             f"[{r.severity}] {r.cwe_id} — {r.file_path} {r.line_number}번 라인",

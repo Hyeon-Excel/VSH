@@ -137,13 +137,39 @@ def validate_code(file_path: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: 분석 결과 dict
     """
+    print(f"\n[VSH] 분석 시작: {file_path}")
+    print("[L1] 패턴 스캔 중...")
     result = _run_analysis(file_path)
     if "error" not in result:
+        l1_count = len(result.get("scan_results", []))
+        print(f"[L1] 완료 - {l1_count}건 탐지")
+        for i, r in enumerate(result.get("scan_results", []), 1):
+            print(f"  [{i}] CWE: {r.get('cwe_id', 'N/A')}  Line: {r.get('line_number', 'N/A')}")
+            print(f"       코드: {r.get('code_snippet', r.get('evidence', 'N/A'))}")
+        print("[L2] LLM 심층 분석 중...")
         for r in result.get("l2_vuln_records", []):
             try:
+                from l3.normalizer import CWE_META
+                cwe_id = r.get("cwe_id", "")
+                meta = CWE_META.get(cwe_id, {})
+                if meta:
+                    if not r.get("owasp_ref") or r.get("owasp_ref") == "N/A":
+                        r["owasp_ref"] = meta.get("owasp", r.get("owasp_ref"))
+                    if r.get("cvss_score") is None:
+                        r["cvss_score"] = meta.get("cvss", r.get("cvss_score"))
                 db._vulns.append(PydanticVulnRecord(**r))
             except Exception as e:
                 print(f"[VSH] L2 record write 실패: {e}")
+        l2_count = len(result.get("l2_vuln_records", []))
+        print(f"[L2] 완료 - {l2_count}건 확정")
+        for i, r in enumerate(result.get("l2_vuln_records", []), 1):
+            print(f"  ┌─ [{i}] CWE: {r.get('cwe_id', 'N/A')}  Line: {r.get('line_number', 'N/A')}  Severity: {r.get('severity', 'N/A')}")
+            print(f"  │  취약 코드  : {r.get('evidence', 'N/A')}")
+            print(f"  │  수정 제안  : {str(r.get('fix_suggestion', 'N/A'))[:120]}")
+            print(f"  │  KISA 근거  : {r.get('kisa_ref', 'N/A')}")
+            print(f"  └{'─' * 60}")
+    else:
+        print(f"[VSH] 분석 실패: {result.get('error')}")
     return result
 
 
@@ -220,6 +246,8 @@ def get_log(file_path: str) -> Dict[str, Any]:
 @mcp.tool()
 async def scan_project(project_path: str) -> str:
     """Cursor/Claude IDE에서 호출하는 L3 프로젝트 보안 스캔 툴."""
+    print(f"\n[L3] 백그라운드 스캔 시작: {project_path}")
+    print("[L3] SonarQube SAST + SBOM 분석 병렬 실행 중...")
     task = asyncio.create_task(
         l3_pipeline.run(project_path)
     )

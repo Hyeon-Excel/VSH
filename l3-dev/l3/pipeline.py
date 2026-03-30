@@ -35,6 +35,14 @@ class L3Pipeline:
             await self.normalizer.save(package)
         print(f"[L3 Pipeline] M2 스캔 완료: {len(package_records)}건")
 
+
+        # M2.5 - SharedDB의 L2 결과를 PoC 대상에 추가
+        from l3.adapters import pydantic_vuln_to_l3
+        l2_pydantic = [v for v in self.normalizer.db._vulns if v.source == "L2"]
+        l2_records = [pydantic_vuln_to_l3(v) for v in l2_pydantic]
+        vuln_records.extend(l2_records)
+        print(f"[L3 Pipeline] M2.5 L2 결과 {len(l2_records)}건 추가")
+
         # M3 - PoC 검증 → M4 저장
         for record in vuln_records:
             print(f"[L3 Pipeline] M3 PoC 실행 중: {record.vuln_id}")

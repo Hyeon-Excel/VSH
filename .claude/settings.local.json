@@ -9,5 +9,8 @@
       "Bash(timeout 600 python -c \":*)",
       "Bash(timeout 60 python -c \":*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "vsh"
+  ]
 }

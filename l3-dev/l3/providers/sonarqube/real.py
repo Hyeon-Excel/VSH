@@ -172,9 +172,22 @@ class RealSonarQubeProvider(AbstractSonarQubeProvider):
             )
             if response.status_code == 200:
                 issues = response.json().get("issues", [])
-                print(f"[L3 SonarQube] 이슈 {len(issues)}건 발견")
-                return issues
-            print(f"[L3 SonarQube] 이슈 조회 실패: {response.status_code}")
+                excluded = [
+                    "l3-dev/", "VSH-l1-l2-integration/", "vsh_demo.py",
+                    "vsh_watcher.py", "mcp_server_unified.py", "fix_emoji.py",
+                    "dashboard/", "tests/", "reports/", "archive/",
+                    "modules/", "pipeline/", "repository/", "tools/"
+                ]
+                filtered = [
+                    issue for issue in issues
+                    if not any(
+                        issue.get("component", "").split(":")[-1].startswith(e)
+                        for e in excluded
+                    )
+                    and issue.get("component", "").split(":")[-1] != self.sonar_project_key
+                ]
+                print(f"[L3 SonarQube] 이슈 {len(issues)}건 발견 → {len(filtered)}건 필터링 후")
+                return filtered
             return []
         except Exception as e:
             print(f"[L3 SonarQube] 이슈 조회 예외 발생: {str(e)}")

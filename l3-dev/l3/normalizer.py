@@ -1,6 +1,27 @@
 from l3.schema import VulnRecord, PackageRecord
 from l3.providers.base import AbstractSharedDB
 
+CWE_META = {
+    "CWE-89":  {"owasp": "A03:2021 - Injection",                    "cvss": 9.8},
+    "CWE-78":  {"owasp": "A03:2021 - Injection",                    "cvss": 9.8},
+    "CWE-79":  {"owasp": "A03:2021 - Injection",                    "cvss": 6.1},
+    "CWE-829": {"owasp": "A06:2021 - Vulnerable and Outdated Components", "cvss": 7.5},
+    "CWE-798": {"owasp": "A07:2021 - Identification and Authentication Failures", "cvss": 7.5},
+    "CWE-22":  {"owasp": "A01:2021 - Broken Access Control",         "cvss": 7.5},
+    "CWE-502": {"owasp": "A08:2021 - Software and Data Integrity",   "cvss": 9.8},
+}
+
+def apply_cwe_meta(record):
+    if not hasattr(record, "cwe_id"):
+        return record
+    meta = CWE_META.get(record.cwe_id, {})
+    if meta:
+        if not record.owasp_ref or record.owasp_ref == "N/A":
+            record.owasp_ref = meta.get("owasp", record.owasp_ref)
+        if record.cvss_score is None:
+            record.cvss_score = meta.get("cvss", record.cvss_score)
+    return record
+
 class L3Normalizer:
     """M4: 스키마 검증 및 Shared DB 저장을 담당하는 Normalizer"""
 
@@ -12,6 +33,7 @@ class L3Normalizer:
         """레코드를 DB에 저장하며, 실패 시 scan_error 상태로 재시도한다."""
         try:
             # 1단계: 1차 저장 시도
+            record = apply_cwe_meta(record)
             await self.db.write(record)
             # 5단계: 정상 저장 시 로그 출력
             print(f"[L3 Normalizer] 저장 완료: {type(record).__name__}")

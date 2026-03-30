@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vsh": {
+      "command": "python",
+      "args": ["C:/Users/LG/Desktop/VSH_Final/mcp_server_unified.py"],
+      "env": {
+        "LLM_PROVIDER": "gemini"
+      }
+    }
+  }
+}
